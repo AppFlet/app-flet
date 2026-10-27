@@ -1,6 +1,7 @@
 'use strict';
 (function () {
   const root = window;
+  const VERSION = 11;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -23,6 +24,7 @@
   }
 
   // ---------- Estado de pantalla ----------
+  let hoyVisto = null;
   const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const today = () => ymd(new Date());
   const shiftDay = (f, n) => { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
@@ -218,7 +220,7 @@ ${row('notas', 'Bitácora', 'Notas del día', false)}
 ${row('pasar', 'Pasar datos entre celulares', 'Enviar cierre, sumar cierre y saldos', false)}
 ${row('respaldo', 'Respaldo', 'Hacer o restaurar el archivo de respaldo', true)}
 ${row('archivar', 'Limpiar historial viejo', 'Si la app se pone lenta: borra días anteriores y deja los saldos', true)}
-<div class="empty" style="padding:14px 6px;font-size:13px">${DB.clients.length} clientes · ${dias} días guardados en este celular</div></div>` + nav();
+<div class="empty" style="padding:14px 6px;font-size:13px">${DB.clients.length} clientes · ${dias} días guardados en este celular · versión ${VERSION}</div></div>` + nav();
   }
 
   function viewRespaldo() {
@@ -296,7 +298,7 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     if (!S.modal) return '';
     const m = S.modal;
     const pins = m.pin ? `<input id="mpin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="PIN" placeholder="PIN de 4 números" style="height:52px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:22px;letter-spacing:6px;text-align:center">${m.pin === 2 ? '<input id="mpin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Repetir PIN" placeholder="Repetilo" style="height:52px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:22px;letter-spacing:6px;text-align:center">' : ''}<div id="merr" role="alert" style="color:#B3261E;font-weight:700;min-height:18px;font-size:14px"></div>` : '';
-    return `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(m.title)}"><div class="box"><h3>${esc(m.title)}</h3><p>${m.text}</p>${pins}<div class="btns"><button class="btn ghost" data-a="m-no">ATRÁS</button><button class="btn ${m.danger ? 'red' : 'green'}" data-a="m-ok">${esc(m.ok)}</button></div></div></div>`;
+    return `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(m.title)}"><div class="box"><h3>${esc(m.title)}</h3><p>${m.text}</p>${pins}<div class="btns"><button class="btn ghost" data-a="m-no">${esc(m.cancel || 'ATRÁS')}</button><button class="btn ${m.danger ? 'red' : 'green'}" data-a="m-ok">${esc(m.ok)}</button></div></div></div>`;
   }
 
   function render() {
@@ -416,12 +418,20 @@ ${inp('ar-nf', 'Retiro no facturado', fv(rec.retiroNF), 'data-arq="1"')}${inp('a
 <div class="foot">${lk ? '<button class="btn ghost" data-a="adestr" style="flex:1">🔒 DESTRABAR ARQUEO</button>' : '<button class="btn green" data-a="asave" style="flex:1">GUARDAR ARQUEO</button>'}</div>` + nav();
     return lk ? html.replace(/ data-arq=/g, ' disabled data-arq=') : html;
   }
+  // Cuando están guardados los 3 pasos del día (Cierre, Arqueo y Logística) se ofrece el respaldo.
+  function preguntarRespaldo() {
+    const f = S.fecha;
+    if (!diaBloqueado(f) || !recBloq(DB.arqueo[f]) || !recBloq(DB.logisticaTxns[f])) return;
+    S.modal = { title: 'Día completo guardado', ok: 'HACER RESPALDO', cancel: 'MÁS TARDE',
+      text: `Ya guardaste Cierre, Arqueo y Logística del <b>${esc(fechaLarga(f))}</b>.<br><br>¿Hacés el respaldo ahora?`, onOk: hacerRespaldo };
+    render();
+  }
   function guardarArqueo() {
     const ids = ['ar-d1', 'ar-d2', 'ar-nf', 'ar-gen'];
     if (ids.some((i) => isNaN(L.parseAR(document.getElementById(i).value)))) return toast('Hay un número que no es válido.', 3000);
     const v = arVals();
     DB.arqueo[S.fecha] = Object.assign(v, { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true });
-    if (persist()) { toast('Arqueo guardado y bloqueado'); render(); }
+    if (persist()) { toast('Arqueo guardado y bloqueado'); render(); preguntarRespaldo(); }
   }
 
   // ---------- Logística ----------
@@ -454,7 +464,7 @@ ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${inp('l
     const ids = ['lg-ef', 'lg-mp', 'lg-tr', 'lg-pa', 'lg-co'];
     if (ids.some((i) => isNaN(L.parseAR(document.getElementById(i).value)))) return toast('Hay un número que no es válido.', 3000);
     DB.logisticaTxns[S.fecha] = Object.assign(lgVals(), { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true });
-    if (persist()) { toast('Logística guardada y bloqueada'); render(); }
+    if (persist()) { toast('Logística guardada y bloqueada'); render(); preguntarRespaldo(); }
   }
 
   // ---------- Pasar datos entre celulares ----------
@@ -631,7 +641,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       const day = DB.allTxns[S.fecha];
       if (!day || Object.keys(day).filter((k) => k !== '__meta__').length === 0) return toast('No hay nada cargado en este día.');
       day.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true };
-      S.open = null; if (persist()) { toast('Día guardado y bloqueado'); render(); }
+      S.open = null; if (persist()) { toast('Día guardado y bloqueado'); render(); preguntarRespaldo(); }
     }
     else if (a === 'respaldo') hacerRespaldo();
     else if (a === 'restaurar') { const f = document.getElementById('file'); if (f) { f.value = ''; f.click(); } }
@@ -706,6 +716,17 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       if (c2) c2.textContent = L.fmtAR(cobrado(tt));
     }
   });
+
+  // Si la app quedó abierta de un día para el otro, pasa sola al día de hoy.
+  hoyVisto = today();
+  function revisarDia() {
+    const h = today(); if (h === hoyVisto) return;
+    if (S.fecha === hoyVisto) S.fecha = h;
+    hoyVisto = h; S.open = null; if (!S.modal) render();
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) revisarDia(); });
+  window.addEventListener('focus', revisarDia);
+  setInterval(revisarDia, 30000);
 
   render();
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
