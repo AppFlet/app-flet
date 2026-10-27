@@ -156,11 +156,11 @@
       else if (iguales(ya, c.dia[cid])) r.iguales.push(nom);
       else r.conflictos.push(nom);
     }
-    if (aplicar && r.agregados.length) { const m = db.allTxns[f].__meta__; db.allTxns[f].__meta__ = m || { editadoPor: c.de, actualizadoEl: new Date().toISOString() }; }
+    if (aplicar && r.agregados.length) { const m = db.allTxns[f].__meta__; db.allTxns[f].__meta__ = m || { editadoPor: c.de, actualizadoEl: new Date().toISOString(), guardado: false }; }
     const trat = (k, ks, nombre) => {
       const nuevo = c[nombre === 'arqueo' ? 'arqueo' : 'logistica']; if (!nuevo) return;
       const ya = (db[k] || {})[f];
-      if (!algo(ya, ks)) { r[nombre] = 'agregado'; if (aplicar) db[k][f] = Object.assign({}, nuevo, { editadoPor: nuevo.editadoPor || c.de }); }
+      if (!algo(ya, ks)) { r[nombre] = 'agregado'; if (aplicar) db[k][f] = Object.assign({}, nuevo, { editadoPor: nuevo.editadoPor || c.de, guardado: false }); }
       else if (mismo(ya, nuevo, ks)) r[nombre] = 'igual'; else r[nombre] = 'conflicto';
     };
     trat('arqueo', IGUALES_AR, 'arqueo'); trat('logisticaTxns', IGUALES_LG, 'logistica');
@@ -209,7 +209,38 @@
     return [{ name: 'Clientes', rows: cli }, { name: 'Historial clientes', rows: hist }, { name: 'Arqueo', rows: arq }, { name: 'Logística', rows: log }];
   }
 
-  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel };
+  // El empleado recibe los datos del titular. El titular manda en los días ya guardados;
+  // lo que el empleado cargó en días sin guardar (o que el titular no tiene) se conserva.
+  function recibirDatos(db, o, aplicar) {
+    const cp = (x) => JSON.parse(JSON.stringify(x || {}));
+    const nuevo = { clients: cp(o.clients).length ? JSON.parse(JSON.stringify(o.clients)) : [], allTxns: cp(o.allTxns), arqueo: cp(o.arqueo), logisticaTxns: cp(o.logisticaTxns),
+      baseSemana: o.baseSemana ? cp(o.baseSemana) : cp(db.baseSemana), notas: Array.isArray(o.notas) ? cp(o.notas) : [] };
+    const desde = (nuevo.baseSemana && nuevo.baseSemana.desde) || '';
+    const abierto = (m) => !m || m.guardado === false;       // día sin guardar
+    const r = { conservadas: 0, reemplazadas: 0 };
+    for (const f of Object.keys(db.allTxns || {})) {
+      if (desde && f < desde) continue;
+      const mio = db.allTxns[f], suyo = nuevo.allTxns[f];
+      for (const cid of Object.keys(mio)) {
+        if (cid === '__meta__' || !tieneDatos(mio[cid])) continue;
+        const s = suyo && suyo[cid];
+        if (suyo && !abierto(suyo.__meta__)) { if (!iguales(mio[cid], s)) r.reemplazadas++; continue; }
+        if (!tieneDatos(s)) { if (!nuevo.allTxns[f]) nuevo.allTxns[f] = {}; nuevo.allTxns[f][cid] = JSON.parse(JSON.stringify(mio[cid])); if (!nuevo.allTxns[f].__meta__ && mio.__meta__) nuevo.allTxns[f].__meta__ = JSON.parse(JSON.stringify(mio.__meta__)); r.conservadas++; }
+      }
+    }
+    for (const [k, ks] of [['arqueo', IGUALES_AR], ['logisticaTxns', IGUALES_LG]]) for (const f of Object.keys(db[k] || {})) {
+      if (desde && f < desde) continue;
+      const mio = db[k][f], suyo = nuevo[k][f];
+      if (!algo(mio, ks)) continue;
+      if (!algo(suyo, ks)) { nuevo[k][f] = JSON.parse(JSON.stringify(mio)); r.conservadas++; }
+      else if (!mismo(mio, suyo, ks) && suyo.guardado !== false) r.reemplazadas++;
+    }
+    if (aplicar) { db.clients = nuevo.clients; db.allTxns = nuevo.allTxns; db.arqueo = nuevo.arqueo; db.logisticaTxns = nuevo.logisticaTxns; db.baseSemana = nuevo.baseSemana;
+      const vistos = new Set(nuevo.notas.map((n) => n.fecha + '|' + n.texto + '|' + n.usuario)); (db.notas || []).forEach((n) => { if (!vistos.has(n.fecha + '|' + n.texto + '|' + n.usuario)) nuevo.notas.push(n); }); db.notas = nuevo.notas; }
+    return r;
+  }
+
+  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.R284 = api;
 })(typeof window !== 'undefined' ? window : globalThis);

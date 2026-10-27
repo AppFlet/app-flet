@@ -73,8 +73,17 @@
     if (!day[cid]) day[cid] = { compra: 0, efectivo1: 0, efectivo2: 0, mercadopago: 0, transferencia: 0, ajuste: 0 };
     day[cid][k] = v;
     if (L.KEYS.every((x) => !day[cid][x])) delete day[cid];
-    day.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString() };
+    day.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: false };
     persist();
+  }
+  // Un día "guardado" queda bloqueado. Los días de la app anterior (con sello y sin la marca) también.
+  const diaMeta = (f) => (DB.allTxns[f] && DB.allTxns[f].__meta__) || null;
+  const diaBloqueado = (f) => { const m = diaMeta(f); return !!m && m.guardado !== false; };
+  const recBloq = (rec) => !!rec && rec.guardado !== false;
+  function bannerBloq(rec, accion) {
+    const d = rec.actualizadoEl ? new Date(rec.actualizadoEl) : null;
+    const cuando = d && !isNaN(d) ? d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    return `<button class="banner lockb" data-a="${accion}"><b>🔒 Guardado — destrabar</b><small>${esc(rec.editadoPor || '')}${cuando ? ' · ' + esc(cuando) : ''}</small></button>`;
   }
   const getT = (f, cid) => (DB.allTxns[f] && DB.allTxns[f][cid]) || null;
 
@@ -117,7 +126,7 @@
     const antes = L.saldoHasta(DB, c.id, f, false);
     const nuevo = L.r2(antes + L.mov(t));
     if (S.open === c.id || S.todos) {
-      const fld = (k, lab, bold) => `<label class="f">${lab}<input type="text" inputmode="decimal" data-k="${k}" data-id="${c.id}" class="${t && t[k] ? 'has' : ''}" placeholder="0,00" value="${t && t[k] ? L.fmtAR(t[k]) : ''}"></label>`;
+      const fld = (k, lab, bold) => `<label class="f">${lab}<input type="text" inputmode="decimal" data-k="${k}" data-id="${c.id}" class="${t && t[k] ? 'has' : ''}" placeholder="0,00" value="${t && t[k] ? L.fmtAR(t[k]) : ''}"${diaBloqueado(f) ? ' disabled' : ''}></label>`;
       return `<section class="card open" aria-label="${esc(c.name)}"><button class="crow" data-a="close"><span class="n">${esc(c.name)}</span><span class="s" style="margin:0">Saldo anterior ${L.fmtAR(antes)}${S.todos ? '' : ' · cerrar ▲'}</span></button>
 <div class="grid">${fld('compra', 'Compra')}${fld('efectivo1', 'Efectivo COB 1')}${fld('efectivo2', 'Efectivo COB 2')}${fld('mercadopago', 'MercadoPago')}${fld('transferencia', 'Transferencia')}${fld('ajuste', 'Ajuste (+ / −)')}</div>
 <div class="new"><span class="a">Saldo nuevo</span><span class="b ${cls(nuevo)}" id="new-${c.id}">${L.fmtAR(nuevo)}</span></div></section>`;
@@ -143,13 +152,32 @@
 
   function footHTML() {
     const t = dayTotals();
-    return `<div class="t">Compras del día<b id="tot-compras">${L.fmtAR(t.compras)}</b></div><div class="t">Cobrado<b id="tot-cobrado">${L.fmtAR(cobrado(t))}</b></div><button class="btn green" data-a="guardar">GUARDAR DÍA</button>`;
+    return `<div class="t">Compras del día<b id="tot-compras">${L.fmtAR(t.compras)}</b></div><div class="t">Cobrado<b id="tot-cobrado">${L.fmtAR(cobrado(t))}</b></div>${diaBloqueado(S.fecha) ? '<button class="btn ghost" data-a="destrabar">🔒 DESTRABAR</button>' : '<button class="btn green" data-a="guardar">GUARDAR DÍA</button>'}`;
   }
 
+  function lockBanner() {
+    const m = diaMeta(S.fecha) || {}, d = m.actualizadoEl ? new Date(m.actualizadoEl) : null;
+    const cuando = d && !isNaN(d) ? d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    return `<div style="padding:8px 12px 0"><button class="banner lockb" data-a="destrabar"><b>🔒 Día guardado — destrabar el día completo</b><small>${esc(m.editadoPor || '')}${cuando ? ' · ' + esc(cuando) : ''}</small></button></div>`;
+  }
+  function confirmDestrabarRec(tipo) {
+    const k = tipo === 'arqueo' ? 'arqueo' : 'logisticaTxns', nom = tipo === 'arqueo' ? 'el Arqueo' : 'la Logística';
+    S.modal = { title: '¿Destrabar ' + nom + '?', ok: 'DESTRABAR', danger: true,
+      text: `Se puede volver a editar ${nom} del <b>${esc(fechaLarga(S.fecha))}</b>. Acordate de guardar al terminar.`,
+      onOk: () => { const r = DB[k][S.fecha]; if (r) { r.guardado = false; r.editadoPor = S.name; r.actualizadoEl = new Date().toISOString(); } if (persist()) toast('Destrabado', 3000); } };
+    render();
+  }
+  function confirmDestrabar() {
+    S.modal = { title: '¿Destrabar el día completo?', ok: 'DESTRABAR', danger: true,
+      text: `Se pueden volver a editar <b>todos los clientes</b> del <b>${esc(fechaLarga(S.fecha))}</b>. Acordate de tocar GUARDAR DÍA al terminar.`,
+      onOk: () => { const m = diaMeta(S.fecha); if (m) { m.guardado = false; m.actualizadoEl = new Date().toISOString(); m.editadoPor = S.name; } if (persist()) toast('Día destrabado', 3000); } };
+    render();
+  }
   function viewCierre() {
     const dom = dateObj(S.fecha).getDay() === 0;
     return header('Cierre del día', true) +
       (dom ? '<div style="padding:8px 12px 0"><div class="banner">Es domingo: normalmente no se trabaja. Podés cargar igual si hace falta.</div></div>' : '') +
+      (diaBloqueado(S.fecha) ? lockBanner() : '') +
       `<div class="search"><input id="q" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="btn sm ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">Con saldo</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Todos abiertos' : 'Abrir todos'}</button></div>` +
       `<div class="body" id="list">${listHTML()}</div><div class="foot" id="foot">${footHTML()}</div>` + nav();
   }
@@ -376,7 +404,8 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     const x = L.arqueoDia(DB, f), p = L.arqueoAcum(DB, f, false);
     const line = (l, v) => `<div class="rline"><span>${l}</span><b>${L.fmtAR(v)}</b></div>`;
     const R = (l, id, n, big) => `<div class="rline${big ? ' big' : ''}"><span>${l}</span><span id="${id}">${difBadge(n, 'Faltan', 'Sobran')}</span></div>`;
-    return header('Arqueo', true) + `<div class="body">
+    const lk = recBloq(DB.arqueo[f]);
+    const html = header('Arqueo', true) + `<div class="body">${lk ? bannerBloq(DB.arqueo[f], 'adestr') : ''}
 <section class="card sec"><h2>Lo que se cobró (viene del Cierre)</h2>${line('Efectivo COB 1', t.efectivo1)}${line('Efectivo COB 2', t.efectivo2)}${line('MercadoPago', t.mercadopago)}${line('Transferencias', t.transferencia)}</section>
 <section class="card sec"><h2>Lo que se depositó</h2><div class="grid2">
 ${inp('ar-d1', 'Depositado COB 1', fv(rec.depositado1), 'data-arq="1"')}${inp('ar-d2', 'Depositado COB 2', fv(rec.depositado2), 'data-arq="1"')}
@@ -384,14 +413,15 @@ ${inp('ar-nf', 'Retiro no facturado', fv(rec.retiroNF), 'data-arq="1"')}${inp('a
 </div><p style="margin:10px 0 0">El general se completa solo (COB 1 + COB 2 − retiro). Si el banco te dio otro número, escribilo.</p></section>
 <section class="card res">${R('Diferencia del día', 'ar-rdg', x.dg, true)}${R('Acumulada general', 'ar-rag', L.r2(p.g + x.dg))}${R('COB 1 · día', 'ar-rd1', x.d1)}${R('COB 1 · acumulada', 'ar-ra1', L.r2(p.c1 + x.d1))}${R('COB 2 · día', 'ar-rd2', x.d2)}${R('COB 2 · acumulada', 'ar-ra2', L.r2(p.c2 + x.d2))}
 <p style="margin:8px 0 0;font-size:12px;color:#55625F">"Faltan" = se cobró más de lo que se depositó. "Sobran" = se depositó de más.</p></section></div>
-<div class="foot"><button class="btn green" data-a="asave" style="flex:1">GUARDAR ARQUEO</button></div>` + nav();
+<div class="foot">${lk ? '<button class="btn ghost" data-a="adestr" style="flex:1">🔒 DESTRABAR ARQUEO</button>' : '<button class="btn green" data-a="asave" style="flex:1">GUARDAR ARQUEO</button>'}</div>` + nav();
+    return lk ? html.replace(/ data-arq=/g, ' disabled data-arq=') : html;
   }
   function guardarArqueo() {
     const ids = ['ar-d1', 'ar-d2', 'ar-nf', 'ar-gen'];
     if (ids.some((i) => isNaN(L.parseAR(document.getElementById(i).value)))) return toast('Hay un número que no es válido.', 3000);
     const v = arVals();
-    DB.arqueo[S.fecha] = Object.assign(v, { editadoPor: S.name, actualizadoEl: new Date().toISOString() });
-    if (persist()) toast('Arqueo guardado');
+    DB.arqueo[S.fecha] = Object.assign(v, { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true });
+    if (persist()) { toast('Arqueo guardado y bloqueado'); render(); }
   }
 
   // ---------- Logística ----------
@@ -408,7 +438,8 @@ ${inp('ar-nf', 'Retiro no facturado', fv(rec.retiroNF), 'data-arq="1"')}${inp('a
     const f = S.fecha, saved = DB.logisticaTxns[f], sug = L.sugLogistica(DB, f), rec = saved || { efectivoAyer: sug.efectivoAyer, mercadopagoAyer: sug.mercadopagoAyer, transferenciaAyer: sug.transferenciaAyer };
     const d = L.difLog(rec), a = L.logAcum(DB, f, false);
     const hint = saved ? '' : `<div class="banner" style="font-size:13px">Valores sugeridos${sug.fechaCobro ? ' con el Cierre del ' + esc(fechaCorta(sug.fechaCobro)) : ''}${sug.fechaArqueo ? ' y el Arqueo del ' + esc(fechaCorta(sug.fechaArqueo)) : ''}. Revisalos antes de guardar.</div>`;
-    return header('Logística', true) + `<div class="body">${hint}
+    const lk = recBloq(saved);
+    const html = header('Logística', true) + `<div class="body">${lk ? bannerBloq(saved, 'ldestr') : ''}${hint}
 <section class="card sec"><h2>Lo que se cobró ayer</h2><div class="grid2">
 ${inp('lg-ef', 'Efectivo depositado', fv(rec.efectivoAyer), 'data-lg="1"')}${inp('lg-mp', 'MercadoPago', fv(rec.mercadopagoAyer), 'data-lg="1"')}
 ${inp('lg-tr', 'Transferencia', fv(rec.transferenciaAyer), 'data-lg="1"')}</div></section>
@@ -416,13 +447,14 @@ ${inp('lg-tr', 'Transferencia', fv(rec.transferenciaAyer), 'data-lg="1"')}</div>
 ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${inp('lg-co', 'Corrección (+ / −)', fv(rec.correccion), 'data-lg="1"')}</div></section>
 <section class="card res"><div class="rline big"><span>Diferencia del día</span><span id="lg-rd">${difBadge(d, 'Falta acreditar', 'Acreditó de más')}</span></div>
 <div class="rline"><span>Diferencia acumulada</span><span id="lg-ra">${difBadge(L.r2(a + d), 'Falta acreditar', 'Acreditó de más')}</span></div></section></div>
-<div class="foot"><button class="btn green" data-a="lsave" style="flex:1">GUARDAR LOGÍSTICA</button></div>` + nav();
+<div class="foot">${lk ? '<button class="btn ghost" data-a="ldestr" style="flex:1">🔒 DESTRABAR LOGÍSTICA</button>' : '<button class="btn green" data-a="lsave" style="flex:1">GUARDAR LOGÍSTICA</button>'}</div>` + nav();
+    return lk ? html.replace(/ data-lg=/g, ' disabled data-lg=') : html;
   }
   function guardarLogistica() {
     const ids = ['lg-ef', 'lg-mp', 'lg-tr', 'lg-pa', 'lg-co'];
     if (ids.some((i) => isNaN(L.parseAR(document.getElementById(i).value)))) return toast('Hay un número que no es válido.', 3000);
-    DB.logisticaTxns[S.fecha] = Object.assign(lgVals(), { editadoPor: S.name, actualizadoEl: new Date().toISOString() });
-    if (persist()) toast('Logística guardada');
+    DB.logisticaTxns[S.fecha] = Object.assign(lgVals(), { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true });
+    if (persist()) { toast('Logística guardada y bloqueada'); render(); }
   }
 
   // ---------- Pasar datos entre celulares ----------
@@ -434,9 +466,9 @@ ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${inp('l
 <button class="btn green" data-a="p-enviar" ${nada ? 'disabled style="opacity:.4;width:100%"' : 'style="width:100%"'}>ENVIAR CIERRE</button></section>
 <section class="card sec"><h2>Sumar cierre (titular) ${un ? '' : LOCK}</h2><p>Abrí el archivo que te mandó el empleado. Se <b>suma</b> a tus datos: no se borra nada. Si ya tenías algo distinto en un cliente, queda lo tuyo.</p>
 ${un ? '<label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-c" type="file" accept=".json,application/json" hidden></label>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}</section>
-<section class="card sec"><h2>Saldos actualizados (titular) ${un ? '' : LOCK}</h2><p>Genera un archivo con todos los clientes y saldos al día para que los empleados lo reciban.</p>
-${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR SALDOS</button>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}</section>
-<section class="card sec"><h2>Recibir saldos (empleado)</h2><p>Abrí el archivo de saldos que mandó el titular. Reemplaza los datos de este celular; si tenías cargas sin enviar, te avisa antes.</p>
+<section class="card sec"><h2>Enviar datos al día (titular) ${un ? '' : LOCK}</h2><p>Genera un archivo con todos los datos al día (también sirve para mandar una corrección de días anteriores). Los empleados lo reciben con <b>Recibir datos</b>.</p>
+${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</button>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}</section>
+<section class="card sec"><h2>Recibir datos del titular (empleado)</h2><p>Abrí el archivo que mandó el titular. Se actualizan los saldos y los días corregidos. Lo que ya cargaste hoy sin guardar no se pierde.</p>
 <label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-s" type="file" accept=".json,application/json" hidden></label></section></div>` + nav();
   }
   function enviarCierre() {
@@ -447,6 +479,20 @@ ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR SALDOS</
   function enviarSaldos() {
     const d = Object.assign(datosCompletos(), { tipo: 'saldos-r284' });
     entregar('saldos-actualizados-' + today() + '.json', new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }), 'Saldos guardados en Descargas. Mandalos por WhatsApp.');
+  }
+  function leerSaldos(file) {
+    const r = new FileReader();
+    r.onerror = () => toast('No se pudo leer el archivo. No se cambió nada.', 4000);
+    r.onload = () => {
+      let o; try { o = JSON.parse(r.result); } catch (e) { return toast('Ese archivo no es válido. No se cambió nada.', 4500); }
+      if (!o || !Array.isArray(o.clients) || !o.allTxns || typeof o.allTxns !== 'object') return toast('Ese archivo no parece de la app. No se cambió nada.', 4500);
+      const p = L.recibirDatos(DB, o, false);
+      S.modal = { title: '¿Recibir los datos del titular?', ok: 'RECIBIR', danger: false,
+        text: `Trae <b>${o.clients.length} clientes</b> y <b>${Object.keys(o.allTxns).length} días</b>. Reemplaza los saldos y los días guardados de este celular.<br><br>Se mantienen tus <b>${p.conservadas}</b> cargas de días sin guardar.${p.reemplazadas ? `<br><br><b style="color:#B3261E">${p.reemplazadas} cargas tuyas de días ya guardados quedan reemplazadas por las del titular.</b>` : ''}`,
+        onOk: () => { L.recibirDatos(DB, o, true); if (persist()) toast('Datos recibidos', 3500); } };
+      render();
+    };
+    r.readAsText(file);
   }
   function leerCierre(file) {
     const r = new FileReader();
@@ -522,7 +568,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
           PAGOS.forEach((p) => { dd[id][p] = 0; });
           if (L.KEYS.every((k) => !dd[id][k])) delete dd[id];
         }
-        dd.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString() };
+        dd.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: false };
         if (persist()) toast('Día limpiado. Podés deshacerlo desde Más.', 4000);
       } };
     render();
@@ -574,6 +620,9 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'lock') { S.logged = false; S.buf = ''; S.stage = 'entrar'; S.msg = ''; render(); }
     else if (a === 'tab') { S.tab = v; S.sub = null; S.selCli = null; render(); }
     else if (a === 'dia') { S.fecha = shiftDay(S.fecha, Number(v)); S.open = null; render(); }
+    else if (a === 'destrabar') requirePin(confirmDestrabar);
+    else if (a === 'adestr') requirePin(() => confirmDestrabarRec('arqueo'));
+    else if (a === 'ldestr') requirePin(() => confirmDestrabarRec('logistica'));
     else if (a === 'solo') { S.solo = !S.solo; render(); }
     else if (a === 'todos') { S.todos = !S.todos; try { localStorage.setItem('r284.todos', S.todos ? '1' : '0'); } catch (e) {} S.open = null; render(); }
     else if (a === 'open') { S.open = v; refreshList(); const el = document.querySelector('.card.open'); if (el) el.scrollIntoView({ block: 'nearest' }); }
@@ -581,8 +630,8 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'guardar') {
       const day = DB.allTxns[S.fecha];
       if (!day || Object.keys(day).filter((k) => k !== '__meta__').length === 0) return toast('No hay nada cargado en este día.');
-      day.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString() };
-      if (persist()) toast('Día guardado');
+      day.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true };
+      S.open = null; if (persist()) { toast('Día guardado y bloqueado'); render(); }
     }
     else if (a === 'respaldo') hacerRespaldo();
     else if (a === 'restaurar') { const f = document.getElementById('file'); if (f) { f.value = ''; f.click(); } }
@@ -636,10 +685,11 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     if (t.id === 'file' && t.files && t.files[0]) return leerArchivo(t.files[0]);
     if (t.dataset && t.dataset.opt) { S[t.dataset.opt] = t.checked; return; }
     if (t.id === 'file-c' && t.files && t.files[0]) return leerCierre(t.files[0]);
-    if (t.id === 'file-s' && t.files && t.files[0]) return leerArchivo(t.files[0]);
+    if (t.id === 'file-s' && t.files && t.files[0]) return leerSaldos(t.files[0]);
     if (t.id === 'arc-corte') { if (/^\d{4}-\d{2}-\d{2}$/.test(t.value)) { S.corte = t.value; render(); } return; }
     if (t.dataset && (t.dataset.arq || t.dataset.lg)) { const n = L.parseAR(t.value); if (isNaN(n)) { toast('Ese número no es válido.'); } else { t.value = n ? L.fmtAR(n) : ''; t.classList.toggle('has', !!n); } return; }
     if (t.dataset && t.dataset.k) {
+      if (diaBloqueado(S.fecha)) return toast('El día está guardado. Destrabalo con el PIN de titular.', 3500);
       const n = L.parseAR(t.value);
       const t0 = getT(S.fecha, t.dataset.id);
       if (isNaN(n)) { toast('Ese número no es válido.'); t.value = t0 && t0[t.dataset.k] ? L.fmtAR(t0[t.dataset.k]) : ''; return; }
