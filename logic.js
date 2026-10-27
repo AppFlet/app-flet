@@ -240,7 +240,43 @@
     return r;
   }
 
-  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos };
+  // ---- Resumen del día y Retiros del mes ----
+  const fmtD = (f) => f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4);
+  const mon = (n) => '$' + fmtAR(n);
+  function textoResumen(db, f) {
+    const t = totalesDia(db, f), a = arqueoDia(db, f), rec = (db.arqueo || {})[f] || {}, lg = (db.logisticaTxns || {})[f] || {};
+    const cob = r2(t.efectivo1 + t.efectivo2 + t.mercadopago + t.transferencia);
+    const ayer = r2((lg.efectivoAyer || 0) + (lg.mercadopagoAyer || 0) + (lg.transferenciaAyer || 0)), af = r2(lg.pagosAfectado || 0);
+    const ac = arqueoAcum(db, f, true), la = logAcum(db, f, true);
+    const L_ = ['RESUMEN DEL DÍA — ' + fmtD(f), '',
+      'Compras: ' + mon(t.compras), 'Cobranzas general: ' + mon(cob), 'Total recaudado — Pago 1: ' + mon(t.efectivo1), 'Total recaudado — Pago 2: ' + mon(t.efectivo2),
+      'Total recaudado — MercadoPago: ' + mon(t.mercadopago), 'Transferencias: ' + mon(t.transferencia), '',
+      'ARQUEO', 'Depositado: ' + mon(rec.depositadoGeneral || 0), 'Diferencia: ' + mon(a.dg),
+      'Cobrador 1 — Recaudado: ' + mon(t.efectivo1), 'Cobrador 1 — Depositado: ' + mon(rec.depositado1 || 0), 'Cobrador 1 — Diferencia: ' + mon(a.d1),
+      'Cobrador 2 — Recaudado: ' + mon(t.efectivo2), 'Cobrador 2 — Depositado: ' + mon(rec.depositado2 || 0), 'Cobrador 2 — Diferencia: ' + mon(a.d2),
+      'Retiro no facturado: ' + mon(rec.retiroNF || 0), 'Diferencia acumulada: ' + mon(ac.g), '',
+      'LOGÍSTICA', 'Rendido ayer: ' + mon(ayer), 'Afectado hoy: ' + mon(af), 'Diferencia: ' + mon(r2(ayer - af))];
+    if (lg.correccion) L_.push('Corrección: ' + mon(lg.correccion));
+    L_.push('Diferencia acumulada: ' + mon(la));
+    return L_.join('\n');
+  }
+  const normN = (s) => String(s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const RETIRO_CLIENTES = ['ROKE', 'NICOLAS'];
+  // Retiros de un mes ('2026-10'): retiro no facturado del Arqueo + ajustes cargados en ROKE y NICOLAS.
+  function retirosMes(db, ym) {
+    const ids = {}; db.clients.forEach((c) => { if (RETIRO_CLIENTES.includes(normN(c.name))) ids[c.id] = c.name; });
+    const dias = new Set(Object.keys(db.arqueo || {}).concat(Object.keys(db.allTxns || {})).filter((d) => d.slice(0, 7) === ym));
+    const filas = []; let total = 0;
+    Array.from(dias).sort().forEach((d) => {
+      const nf = r2(((db.arqueo || {})[d] || {}).retiroNF || 0); const aj = [];
+      for (const cid of Object.keys(ids)) { const x = r2((((db.allTxns || {})[d] || {})[cid] || {}).ajuste || 0); if (x) aj.push({ nombre: ids[cid], monto: x }); }
+      const tot = r2(nf + aj.reduce((a, b) => a + b.monto, 0));
+      if (nf || aj.length) { filas.push({ fecha: d, nf, ajustes: aj, total: tot }); total = r2(total + tot); }
+    });
+    return { total, filas };
+  }
+
+  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.R284 = api;
 })(typeof window !== 'undefined' ? window : globalThis);

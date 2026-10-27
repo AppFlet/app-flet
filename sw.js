@@ -1,6 +1,6 @@
 // Guarda la app en el celular para que abra sin internet.
 // Con internet siempre busca la versión nueva; sin internet usa la guardada.
-const CACHE = 'r284-v11';
+const CACHE = 'r284-v12';
 const FILES = ['./', 'index.html', 'styles.css', 'logic.js', 'xlsx.js', 'app.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => Promise.all(FILES.map((u) => fetch(new Request(u, { cache: 'reload' })).then((r) => (r.ok ? c.put(u, r) : null))))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });

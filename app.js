@@ -1,7 +1,7 @@
 'use strict';
 (function () {
   const root = window;
-  const VERSION = 11;
+  const VERSION = 12;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -202,6 +202,8 @@
       case 'respaldo': return viewRespaldo();
       case 'archivar': return viewArchivar();
       case 'pasar': return viewPasar();
+      case 'retiros': return viewRetiros();
+      case 'resumen': return viewResumen();
       default: return viewMas();
     }
   }
@@ -214,6 +216,8 @@
 ${sab ? '<div class="banner"><b>Es sábado:</b> hacé el respaldo y guardalo en tu Drive.</div>' : ''}
 ${row('limpiar', 'Limpiar (Cierre diario)', 'Borra compras y pagos de ' + esc(fechaLarga(S.fecha)), true)}
 ${DB.undo ? `<button class="mrow" data-a="menu" data-v="undo" style="border-color:#E8B65A;background:#FFF8E8"><span><b>Deshacer la última limpieza</b><small>Día ${esc(fechaLarga(DB.undo.fecha))}</small></span><span aria-hidden="true">↶</span></button>` : ''}
+${row('resumen', 'Resumen del día', 'Cierre, arqueo y logística en un texto para compartir', false)}
+${row('retiros', 'Retiros del mes', 'Retiro NF y ajustes de ROKE y NICOLAS', true)}
 ${row('historial', 'Historial', 'Movimientos y saldo de cada cliente', false)}
 ${row('clientes', 'Clientes', 'Altas, bajas, mail, teléfono y saldo inicial', true)}
 ${row('notas', 'Bitácora', 'Notas del día', false)}
@@ -467,6 +471,28 @@ ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${inp('l
     if (persist()) { toast('Logística guardada y bloqueada'); render(); preguntarRespaldo(); }
   }
 
+  // ---------- Resumen del día y Retiros ----------
+  async function compartirTexto(txt) {
+    try { if (navigator.share) { await navigator.share({ text: txt }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(txt); toast('Resumen copiado. Pegalo en WhatsApp.', 3500); } catch (e) { toast('No se pudo copiar. Usá Descargar.', 3500); }
+  }
+  function viewResumen() {
+    const f = S.rdia || S.fecha;
+    return subHeader('Resumen del día') + `<div class="body">
+<div class="datebar" style="background:#1B6468;margin:0"><button data-a="rdia" data-v="-1" aria-label="Día anterior">‹</button><span class="d">${esc(fechaLarga(f))}</span><button data-a="rdia" data-v="1" aria-label="Día siguiente">›</button></div>
+<pre class="resu">${esc(L.textoResumen(DB, f))}</pre>
+<div class="btns"><button class="btn green" data-a="r-comp">COMPARTIR</button><button class="btn ghost" data-a="r-desc">DESCARGAR</button></div></div>` + nav();
+  }
+  function viewRetiros() {
+    const ym = S.rmes || today().slice(0, 7), r = L.retirosMes(DB, ym), [y, m] = ym.split('-').map(Number);
+    const mes = new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    const filas = r.filas.map((x) => `<div class="card" style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><span><b>${esc(x.fecha.slice(8, 10) + '/' + x.fecha.slice(5, 7) + '/' + x.fecha.slice(0, 4))}</b><small style="display:block;color:#55625F">${x.nf ? 'Retiro NF ' + L.fmtAR(x.nf) : ''}${x.ajustes.map((j) => (x.nf ? ' · ' : '') + 'Ajuste ' + esc(j.nombre) + ' ' + L.fmtAR(j.monto)).join('')}</small></span><b>${L.fmtAR(x.total)}</b></div>`).join('');
+    return subHeader('Retiros') + `<div class="body">
+<div class="datebar" style="background:#1B6468;margin:0"><button data-a="rmes" data-v="-1" aria-label="Mes anterior">‹</button><span class="d">${esc(mes.charAt(0).toUpperCase() + mes.slice(1))}</span><button data-a="rmes" data-v="1" aria-label="Mes siguiente">›</button></div>
+<div class="card res" style="padding:16px"><div style="font-size:13px;color:#55625F">TOTAL RETIRADO EN EL MES</div><div style="font-size:30px;font-weight:800;margin:4px 0">$${L.fmtAR(r.total)}</div><div style="font-size:12px;color:#55625F">Suma el retiro no facturado del Arqueo y los ajustes de ROKE y NICOLAS. Cada mes empieza de cero.</div></div>
+${filas || '<div class="empty">No hay retiros en este mes.</div>'}</div>` + nav();
+  }
+
   // ---------- Pasar datos entre celulares ----------
   function viewPasar() {
     const un = Date.now() < S.titularUntil, c = L.armarCierre(DB, S.fecha, S.name), n = Object.keys(c.dia).length;
@@ -653,6 +679,8 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       else if (v === 'historial') { S.sub = 'historial'; S.selCli = null; S.hq = ''; render(); }
       else if (v === 'clientes') requirePin(() => { S.sub = 'clientes'; S.hq = ''; render(); });
       else if (v === 'notas') { S.sub = 'notas'; render(); }
+      else if (v === 'resumen') { S.sub = 'resumen'; S.rdia = S.fecha; render(); }
+      else if (v === 'retiros') requirePin(() => { S.sub = 'retiros'; S.rmes = today().slice(0, 7); render(); });
       else if (v === 'pasar') { S.sub = 'pasar'; render(); }
       else if (v === 'archivar') requirePin(() => { S.sub = 'archivar'; S.arcOk = false; S.corte = shiftDay(today(), -90); render(); });
       else if (v === 'respaldo') requirePin(() => { S.sub = 'respaldo'; render(); });
@@ -664,6 +692,10 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'cinact') { S.verInact = !S.verInact; render(); }
     else if (a === 'csave') guardarCliente();
     else if (a === 'ctoggle') { const c = DB.clients.find((x) => x.id === S.edit); if (c) { c.active = c.active === false; if (persist()) { toast(c.active ? 'Cliente activado' : 'Cliente desactivado'); S.sub = 'clientes'; S.edit = null; render(); } } }
+    else if (a === 'rdia') { S.rdia = shiftDay(S.rdia || S.fecha, Number(v)); render(); }
+    else if (a === 'rmes') { const [y, m] = (S.rmes || today().slice(0, 7)).split('-').map(Number); const d = new Date(y, m - 1 + Number(v), 1); S.rmes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); render(); }
+    else if (a === 'r-desc') bajar('resumen-' + S.rdia + '.txt', new Blob([L.textoResumen(DB, S.rdia)], { type: 'text/plain' }));
+    else if (a === 'r-comp') compartirTexto(L.textoResumen(DB, S.rdia));
     else if (a === 'p-pin') requirePin(() => render());
     else if (a === 'p-enviar') enviarCierre();
     else if (a === 'p-saldos') enviarSaldos();
