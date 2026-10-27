@@ -31,7 +31,8 @@
     logged: false, stage: DB.config.pinHash ? 'entrar' : 'crear', buf: '', first: '', msg: '',
     name: localStorage.getItem(NAMEKEY) || '',
     tab: 'cierre', sub: null, fecha: today(), q: '', solo: false, open: null, modal: null, toastMsg: '',
-    titularUntil: 0, selCli: null, hq: '', edit: null, verInact: false, rJ: true, rX: true
+    titularUntil: 0, selCli: null, hq: '', edit: null, verInact: false, rJ: true, rX: true,
+    todos: (function () { try { return localStorage.getItem('r284.todos') !== '0'; } catch (e) { return true; } })()
   };
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -115,9 +116,9 @@
     const f = S.fecha, t = getT(f, c.id);
     const antes = L.saldoHasta(DB, c.id, f, false);
     const nuevo = L.r2(antes + L.mov(t));
-    if (S.open === c.id) {
+    if (S.open === c.id || S.todos) {
       const fld = (k, lab, bold) => `<label class="f">${lab}<input type="text" inputmode="decimal" data-k="${k}" data-id="${c.id}" class="${t && t[k] ? 'has' : ''}" placeholder="0,00" value="${t && t[k] ? L.fmtAR(t[k]) : ''}"></label>`;
-      return `<section class="card open" aria-label="${esc(c.name)}"><button class="crow" data-a="close"><span class="n">${esc(c.name)}</span><span class="s" style="margin:0">Saldo anterior ${L.fmtAR(antes)} · cerrar ▲</span></button>
+      return `<section class="card open" aria-label="${esc(c.name)}"><button class="crow" data-a="close"><span class="n">${esc(c.name)}</span><span class="s" style="margin:0">Saldo anterior ${L.fmtAR(antes)}${S.todos ? '' : ' · cerrar ▲'}</span></button>
 <div class="grid">${fld('compra', 'Compra')}${fld('efectivo1', 'Efectivo COB 1')}${fld('efectivo2', 'Efectivo COB 2')}${fld('mercadopago', 'MercadoPago')}${fld('transferencia', 'Transferencia')}${fld('ajuste', 'Ajuste (+ / −)')}</div>
 <div class="new"><span class="a">Saldo nuevo</span><span class="b ${cls(nuevo)}" id="new-${c.id}">${L.fmtAR(nuevo)}</span></div></section>`;
     }
@@ -149,7 +150,7 @@
     const dom = dateObj(S.fecha).getDay() === 0;
     return header('Cierre del día', true) +
       (dom ? '<div style="padding:8px 12px 0"><div class="banner">Es domingo: normalmente no se trabaja. Podés cargar igual si hace falta.</div></div>' : '') +
-      `<div class="search"><input id="q" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="btn sm ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">Con saldo</button></div>` +
+      `<div class="search"><input id="q" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="btn sm ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">Con saldo</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Todos abiertos' : 'Abrir todos'}</button></div>` +
       `<div class="body" id="list">${listHTML()}</div><div class="foot" id="foot">${footHTML()}</div>` + nav();
   }
 
@@ -574,6 +575,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'tab') { S.tab = v; S.sub = null; S.selCli = null; render(); }
     else if (a === 'dia') { S.fecha = shiftDay(S.fecha, Number(v)); S.open = null; render(); }
     else if (a === 'solo') { S.solo = !S.solo; render(); }
+    else if (a === 'todos') { S.todos = !S.todos; try { localStorage.setItem('r284.todos', S.todos ? '1' : '0'); } catch (e) {} S.open = null; render(); }
     else if (a === 'open') { S.open = v; refreshList(); const el = document.querySelector('.card.open'); if (el) el.scrollIntoView({ block: 'nearest' }); }
     else if (a === 'close') { S.open = null; refreshList(); }
     else if (a === 'guardar') {

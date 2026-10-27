@@ -74,3 +74,4 @@ button,input{font:inherit}
 .bdg.okb{background:#1E7A46;color:#fff}.bdg.warn{background:#FFF1D6;color:#5A3A00;border:1px solid #E8B65A}
 .sec .rline b{font-size:15px}
 .chk{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:15px}.chk input{width:24px;height:24px;margin-top:2px;flex:none}.chk small{display:block;font-size:12px;color:#55625F;font-weight:400}
+.search{flex-wrap:wrap}.search input{flex:1 1 100%}.search .btn{flex:1}
