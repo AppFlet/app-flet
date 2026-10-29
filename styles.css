@@ -77,3 +77,7 @@ button,input{font:inherit}
 .search{flex-wrap:wrap}.search input{flex:1 1 100%}.search .btn{flex:1}
 .f input:disabled{background:#EEF2F0;color:#55625F;opacity:1;border-color:#C9D3D0}.lockb{display:block;width:100%;text-align:left;font-size:15px}.lockb small{display:block;margin-top:2px;font-size:12px}
 .resu{white-space:pre-wrap;word-break:break-word;font:14px/1.55 ui-monospace,Menlo,Consolas,monospace;background:#fff;border:1px solid #DCE3E1;border-radius:14px;padding:14px;margin:0;color:#1B2B2A}
+.foot{flex-wrap:wrap}.foot .tots{display:flex;gap:6px;width:100%}.foot .tots .t{flex:1;min-width:0;font-size:11px;font-weight:700;letter-spacing:.2px}.foot .tots .t b{font-size:13px;overflow:hidden;text-overflow:ellipsis}.foot .btn{flex:1}
+.zona{padding:14px;border-left-width:6px}.zona .ztit{font-size:12px;font-weight:800;letter-spacing:.6px;margin-bottom:8px}
+.zt{border-left-color:#0F4C4F;background:#EAF3F2}.zt .ztit{color:#0F4C4F}.zc{border-left-color:#B7791F;background:#FFF8E8}.zc .ztit{color:#8A5A0B}
+.det summary{font-weight:700;cursor:pointer;padding:4px 0}.dtab{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}.dtab th{text-align:right;color:#55625F;font-weight:700;padding:4px 2px}.dtab td{text-align:right;padding:5px 2px;border-top:1px solid #EEF2F0}.dtab th:first-child,.dtab td:first-child{text-align:left}

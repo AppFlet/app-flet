@@ -1,7 +1,7 @@
 'use strict';
 (function () {
   const root = window;
-  const VERSION = 12;
+  const VERSION = 13;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -154,7 +154,7 @@
 
   function footHTML() {
     const t = dayTotals();
-    return `<div class="t">Compras del día<b id="tot-compras">${L.fmtAR(t.compras)}</b></div><div class="t">Cobrado<b id="tot-cobrado">${L.fmtAR(cobrado(t))}</b></div>${diaBloqueado(S.fecha) ? '<button class="btn ghost" data-a="destrabar">🔒 DESTRABAR</button>' : '<button class="btn green" data-a="guardar">GUARDAR DÍA</button>'}`;
+    return `<div class="tots"><div class="t">Compras<b id="tot-compras">${L.fmtAR(t.compras)}</b></div><div class="t">EFECTIVO<b id="tot-efectivo">${L.fmtAR(L.r2(t.efectivo1 + t.efectivo2))}</b></div><div class="t">MP DÍA<b id="tot-mp">${L.fmtAR(t.mercadopago)}</b></div><div class="t">TRANSFER.<b id="tot-transf">${L.fmtAR(t.transferencia)}</b></div></div>${diaBloqueado(S.fecha) ? '<button class="btn ghost" data-a="destrabar">🔒 DESTRABAR</button>' : '<button class="btn green" data-a="guardar">GUARDAR DÍA</button>'}`;
   }
 
   function lockBanner() {
@@ -405,6 +405,12 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     set('ar-rd1', difBadge(x.d1, 'Faltan', 'Sobran')); set('ar-ra1', difBadge(L.r2(p.c1 + x.d1), 'Faltan', 'Sobran'));
     set('ar-rd2', difBadge(x.d2, 'Faltan', 'Sobran')); set('ar-ra2', difBadge(L.r2(p.c2 + x.d2), 'Faltan', 'Sobran'));
   }
+  function detalleArqueoHTML() {
+    const r = L.detalleArqueo(DB);
+    if (!r.length) return '<p>Todavía no hay arqueos guardados.</p>';
+    return '<table class="dtab"><tr><th>Día</th><th>Cobrado</th><th>Deposit.</th><th>Dif.</th><th>Acum.</th></tr>' + r.map((x) =>
+      `<tr><td>${esc(x.fecha.slice(8, 10) + '/' + x.fecha.slice(5, 7))}</td><td>${L.fmtAR(x.cobrado)}</td><td>${L.fmtAR(x.depositado)}</td><td>${L.fmtAR(x.dif)}</td><td><b>${L.fmtAR(x.acum)}</b></td></tr>`).join('') + '</table><p style="margin:8px 0 0">Cobrado = efectivo COB 1 + COB 2. Deposit. = general + retiro NF. Para encontrar una diferencia, compará esta lista con la de tu app anterior.</p>';
+  }
   function viewArqueo() {
     const f = S.fecha, rec = DB.arqueo[f] || {}, t = L.totalesDia(DB, f);
     const x = L.arqueoDia(DB, f), p = L.arqueoAcum(DB, f, false);
@@ -412,13 +418,18 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     const R = (l, id, n, big) => `<div class="rline${big ? ' big' : ''}"><span>${l}</span><span id="${id}">${difBadge(n, 'Faltan', 'Sobran')}</span></div>`;
     const lk = recBloq(DB.arqueo[f]);
     const html = header('Arqueo', true) + `<div class="body">${lk ? bannerBloq(DB.arqueo[f], 'adestr') : ''}
-<section class="card sec"><h2>Lo que se cobró (viene del Cierre)</h2>${line('Efectivo COB 1', t.efectivo1)}${line('Efectivo COB 2', t.efectivo2)}${line('MercadoPago', t.mercadopago)}${line('Transferencias', t.transferencia)}</section>
-<section class="card sec"><h2>Lo que se depositó</h2><div class="grid2">
-${inp('ar-d1', 'Depositado COB 1', fv(rec.depositado1), 'data-arq="1"')}${inp('ar-d2', 'Depositado COB 2', fv(rec.depositado2), 'data-arq="1"')}
+<section class="card sec"><h2>Cobrador 1</h2>${line('Cobrado', t.efectivo1)}
+${inp('ar-d1', 'Depositado', fv(rec.depositado1), 'data-arq="1"')}
+${R('Diferencia', 'ar-rd1', x.d1)}${R('Acumulado', 'ar-ra1', L.r2(p.c1 + x.d1))}</section>
+<section class="card sec"><h2>Cobrador 2</h2>${line('Cobrado', t.efectivo2)}
+${inp('ar-d2', 'Depositado', fv(rec.depositado2), 'data-arq="1"')}
+${R('Diferencia', 'ar-rd2', x.d2)}${R('Acumulado', 'ar-ra2', L.r2(p.c2 + x.d2))}</section>
+<section class="card sec"><h2>Retiro y depósito general</h2><div class="grid2">
 ${inp('ar-nf', 'Retiro no facturado', fv(rec.retiroNF), 'data-arq="1"')}${inp('ar-gen', 'Depositado general', fv(rec.depositadoGeneral), 'data-arq="gen"', rec.depositadoGeneral != null && DB.arqueo[f] ? 'data-touched="1"' : '')}
 </div><p style="margin:10px 0 0">El general se completa solo (COB 1 + COB 2 − retiro). Si el banco te dio otro número, escribilo.</p></section>
-<section class="card res">${R('Diferencia del día', 'ar-rdg', x.dg, true)}${R('Acumulada general', 'ar-rag', L.r2(p.g + x.dg))}${R('COB 1 · día', 'ar-rd1', x.d1)}${R('COB 1 · acumulada', 'ar-ra1', L.r2(p.c1 + x.d1))}${R('COB 2 · día', 'ar-rd2', x.d2)}${R('COB 2 · acumulada', 'ar-ra2', L.r2(p.c2 + x.d2))}
-<p style="margin:8px 0 0;font-size:12px;color:#55625F">"Faltan" = se cobró más de lo que se depositó. "Sobran" = se depositó de más.</p></section></div>
+<section class="card res">${R('Total diferencia del día', 'ar-rdg', x.dg, true)}${R('Total acumulado', 'ar-rag', L.r2(p.g + x.dg), true)}
+<p style="margin:8px 0 0;font-size:12px;color:#55625F">"Faltan" = se cobró más de lo que se depositó. "Sobran" = se depositó de más.</p></section>
+<details class="card sec det"><summary>Ver el acumulado día por día</summary>${detalleArqueoHTML()}</details></div>
 <div class="foot">${lk ? '<button class="btn ghost" data-a="adestr" style="flex:1">🔒 DESTRABAR ARQUEO</button>' : '<button class="btn green" data-a="asave" style="flex:1">GUARDAR ARQUEO</button>'}</div>` + nav();
     return lk ? html.replace(/ data-arq=/g, ' disabled data-arq=') : html;
   }
@@ -451,13 +462,13 @@ ${inp('ar-nf', 'Retiro no facturado', fv(rec.retiroNF), 'data-arq="1"')}${inp('a
   function viewLogistica() {
     const f = S.fecha, saved = DB.logisticaTxns[f], sug = L.sugLogistica(DB, f), rec = saved || { efectivoAyer: sug.efectivoAyer, mercadopagoAyer: sug.mercadopagoAyer, transferenciaAyer: sug.transferenciaAyer };
     const d = L.difLog(rec), a = L.logAcum(DB, f, false);
-    const hint = saved ? '' : `<div class="banner" style="font-size:13px">Valores sugeridos${sug.fechaCobro ? ' con el Cierre del ' + esc(fechaCorta(sug.fechaCobro)) : ''}${sug.fechaArqueo ? ' y el Arqueo del ' + esc(fechaCorta(sug.fechaArqueo)) : ''}. Revisalos antes de guardar.</div>`;
+    const fAnt = sug.fechaCobro || L.diaAnterior(f);
     const lk = recBloq(saved);
-    const html = header('Logística', true) + `<div class="body">${lk ? bannerBloq(saved, 'ldestr') : ''}${hint}
-<section class="card sec"><h2>Lo que se cobró ayer</h2><div class="grid2">
+    const html = header('Logística', true) + `<div class="body">${lk ? bannerBloq(saved, 'ldestr') : ''}
+<section class="card sec"><h2>RENDICIÓN ${esc(fechaCorta(fAnt))}</h2><div class="grid2">
 ${inp('lg-ef', 'Efectivo depositado', fv(rec.efectivoAyer), 'data-lg="1"')}${inp('lg-mp', 'MercadoPago', fv(rec.mercadopagoAyer), 'data-lg="1"')}
 ${inp('lg-tr', 'Transferencia', fv(rec.transferenciaAyer), 'data-lg="1"')}</div></section>
-<section class="card sec"><h2>Lo que acreditó la logística</h2><div class="grid2">
+<section class="card sec"><h2>ACREDITACIÓN LLSSA</h2><div class="grid2">
 ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${inp('lg-co', 'Corrección (+ / −)', fv(rec.correccion), 'data-lg="1"')}</div></section>
 <section class="card res"><div class="rline big"><span>Diferencia del día</span><span id="lg-rd">${difBadge(d, 'Falta acreditar', 'Acreditó de más')}</span></div>
 <div class="rline"><span>Diferencia acumulada</span><span id="lg-ra">${difBadge(L.r2(a + d), 'Falta acreditar', 'Acreditó de más')}</span></div></section></div>
@@ -498,13 +509,15 @@ ${filas || '<div class="empty">No hay retiros en este mes.</div>'}</div>` + nav(
     const un = Date.now() < S.titularUntil, c = L.armarCierre(DB, S.fecha, S.name), n = Object.keys(c.dia).length;
     const nada = !n && !c.arqueo && !c.logistica;
     return subHeader('Pasar datos') + `<div class="body">
-<section class="card sec"><h2>Enviar cierre (empleado)</h2><p>Manda lo que cargaste el <b>${esc(fechaLarga(S.fecha))}</b>: ${n} ${n === 1 ? 'cliente' : 'clientes'}${c.arqueo ? ', arqueo' : ''}${c.logistica ? ', logística' : ''}. Para cambiar el día, volvé a Cierre y elegí otra fecha.</p>
-<button class="btn green" data-a="p-enviar" ${nada ? 'disabled style="opacity:.4;width:100%"' : 'style="width:100%"'}>ENVIAR CIERRE</button></section>
-<section class="card sec"><h2>Sumar cierre (titular) ${un ? '' : LOCK}</h2><p>Abrí el archivo que te mandó el empleado. Se <b>suma</b> a tus datos: no se borra nada. Si ya tenías algo distinto en un cliente, queda lo tuyo.</p>
-${un ? '<label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-c" type="file" accept=".json,application/json" hidden></label>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}</section>
-<section class="card sec"><h2>Enviar datos al día (titular) ${un ? '' : LOCK}</h2><p>Genera un archivo con todos los datos al día (también sirve para mandar una corrección de días anteriores). Los empleados lo reciben con <b>Recibir datos</b>.</p>
+<section class="card zona zt"><div class="ztit">PARA EL TITULAR ${un ? '' : LOCK}</div>
+<h2>Sumar cierre</h2><p>Abrí el archivo que te mandó el cobrador. Se <b>suma</b> a tus datos: no se borra nada. Si ya tenías algo distinto en un cliente, queda lo tuyo.</p>
+${un ? '<label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-c" type="file" accept=".json,application/json" hidden></label>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}
+<h2 style="margin-top:16px">Enviar datos al día</h2><p>Genera un archivo con todos los datos al día (también sirve para mandar una corrección de días anteriores). Los cobradores lo reciben con <b>Recibir datos</b>.</p>
 ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</button>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}</section>
-<section class="card sec"><h2>Recibir datos del titular (empleado)</h2><p>Abrí el archivo que mandó el titular. Se actualizan los saldos y los días corregidos. Lo que ya cargaste hoy sin guardar no se pierde.</p>
+<section class="card zona zc"><div class="ztit">PARA EL COBRADOR</div>
+<h2>Enviar cierre</h2><p>Manda lo que cargaste el <b>${esc(fechaLarga(S.fecha))}</b>: ${n} ${n === 1 ? 'cliente' : 'clientes'}${c.arqueo ? ', arqueo' : ''}${c.logistica ? ', logística' : ''}. Para cambiar el día, volvé a Cierre y elegí otra fecha.</p>
+<button class="btn green" data-a="p-enviar" ${nada ? 'disabled style="opacity:.4;width:100%"' : 'style="width:100%"'}>ENVIAR CIERRE</button>
+<h2 style="margin-top:16px">Recibir datos del titular</h2><p>Abrí el archivo que mandó el titular. Se actualizan los saldos y los días corregidos. Lo que ya cargaste hoy sin guardar no se pierde.</p>
 <label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-s" type="file" accept=".json,application/json" hidden></label></section></div>` + nav();
   }
   function enviarCierre() {
@@ -653,7 +666,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     const a = b.dataset.a, v = b.dataset.v;
     if (a === 'key') { if (S.buf.length < 4) { S.buf += v; S.msg = ''; render(); if (S.buf.length === 4) pinDone(); } }
     else if (a === 'back') { S.buf = S.buf.slice(0, -1); render(); }
-    else if (a === 'lock') { S.logged = false; S.buf = ''; S.stage = 'entrar'; S.msg = ''; render(); }
+    else if (a === 'lock') { S.logged = false; S.titularUntil = 0; S.buf = ''; S.stage = 'entrar'; S.msg = ''; render(); }
     else if (a === 'tab') { S.tab = v; S.sub = null; S.selCli = null; render(); }
     else if (a === 'dia') { S.fecha = shiftDay(S.fecha, Number(v)); S.open = null; render(); }
     else if (a === 'destrabar') requirePin(confirmDestrabar);
@@ -743,9 +756,8 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       const el = document.getElementById('new-' + t.dataset.id);
       if (el) { el.textContent = L.fmtAR(nuevo); el.className = 'b ' + cls(nuevo); }
       const tt = dayTotals();
-      const c1 = document.getElementById('tot-compras'), c2 = document.getElementById('tot-cobrado');
-      if (c1) c1.textContent = L.fmtAR(tt.compras);
-      if (c2) c2.textContent = L.fmtAR(cobrado(tt));
+      const setT = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = L.fmtAR(v); };
+      setT('tot-compras', tt.compras); setT('tot-efectivo', L.r2(tt.efectivo1 + tt.efectivo2)); setT('tot-mp', tt.mercadopago); setT('tot-transf', tt.transferencia);
     }
   });
 

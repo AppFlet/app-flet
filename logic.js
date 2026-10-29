@@ -276,7 +276,18 @@
     return { total, filas };
   }
 
-  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes };
+  function diaAnterior(f) { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  // Día por día: lo cobrado en efectivo, lo depositado (general + retiro NF), la diferencia y el acumulado general.
+  function detalleArqueo(db) {
+    let ac = Number((db.baseSemana || {}).arqueo) || 0;
+    return Object.keys(db.arqueo || {}).sort().map((f) => {
+      const x = arqueoDia(db, f), r = db.arqueo[f];
+      ac = r2(ac + x.dg);
+      return { fecha: f, cobrado: r2(x.t.efectivo1 + x.t.efectivo2), depositado: r2((r.depositadoGeneral || 0) + (r.retiroNF || 0)), dif: x.dg, acum: ac };
+    });
+  }
+
+  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes, diaAnterior, detalleArqueo };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.R284 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
