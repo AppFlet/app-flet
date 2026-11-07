@@ -7,12 +7,1398 @@
 <title>APP FLET</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
-<link rel="stylesheet" href="styles.css">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#F1F4F3;color:#1B2B2A;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input{font:inherit}
+#app{display:flex;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;background:#F1F4F3;position:relative}
+.hdr{background:#0F4C4F;color:#fff;padding:14px 16px 12px;display:flex;flex-direction:column;gap:8px;flex:none}
+.hdr .row{display:flex;align-items:center;justify-content:space-between}
+.hdr h1{margin:0;font-size:22px;font-weight:800}
+.chip{background:#1B6468;border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700;border:0;color:#fff}
+.datebar{display:flex;align-items:center;justify-content:space-between;background:#1B6468;border-radius:12px;padding:4px}
+.datebar button{width:48px;height:44px;border:0;background:transparent;color:#fff;font-size:24px}
+.datebar .d{font-size:17px;font-weight:700}
+.body{flex:1;overflow-y:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
+.search{display:flex;gap:8px;padding:10px 12px 4px;flex:none}
+.search input{flex:1;height:46px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:16px;background:#fff;min-width:0}
+.btn{height:48px;padding:0 18px;border-radius:12px;border:0;background:#0F4C4F;color:#fff;font-size:16px;font-weight:800}
+.btn.green{background:#1E7A46}.btn.amber{background:#F2B544;color:#2A1B00}
+.btn.ghost{background:#E3F0EE;color:#0F4C4F;border:1px solid #0F4C4F}
+.btn.red{background:#fff;color:#B3261E;border:1px solid #B3261E}
+.btn.sm{height:46px;padding:0 14px;font-size:14px}
+.btn.on{background:#0F4C4F;color:#fff;border:0}
+.card{background:#fff;border:1px solid #DCE3E1;border-radius:14px;padding:10px 12px}
+.card.open{border:2px solid #0F4C4F;display:flex;flex-direction:column;gap:10px}
+.crow{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:44px;background:none;border:0;padding:0;text-align:left;color:inherit}
+.crow .n{font-size:16px;font-weight:800}
+.crow .s{font-size:12px;color:#55625F;display:block;margin-top:2px}
+.sal{font-size:16px;font-weight:800;white-space:nowrap}
+.pos{color:#B3261E}.neg{color:#1E7A46}.zero{color:#55625F}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#55625F;font-weight:600}
+.f input{height:46px;border-radius:10px;border:1px solid #C9D3D0;padding:0 8px;font-size:16px;text-align:right;width:100%;color:#1B2B2A;background:#fff}
+.f input.has{font-weight:800;border-color:#0F4C4F}
+.new{display:flex;justify-content:space-between;align-items:center;background:#F1F4F3;border-radius:10px;padding:10px 12px}
+.new .a{font-size:14px;font-weight:700}.new .b{font-size:20px;font-weight:800}
+.foot{display:flex;gap:10px;align-items:center;padding:8px 12px;flex:none;background:#F1F4F3}
+.foot .t{flex:1;font-size:12px;color:#55625F;line-height:1.3}.foot .t b{display:block;font-size:15px;color:#1B2B2A}
+.nav{display:flex;background:#fff;border-top:1px solid #D9DEDC;padding:4px 4px 8px;flex:none}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border:0;background:none;color:#55625F;font-size:12px;font-weight:600;min-height:52px}
+.nav button.act{color:#0F4C4F;font-weight:800}
+.nav svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.login{flex:1;background:#0F4C4F;color:#fff;display:flex;flex-direction:column;align-items:center;padding:40px 24px 24px;gap:18px;overflow-y:auto}
+.login h1{margin:0;font-size:32px;font-weight:800;text-align:center}
+.login p{margin:0;color:#CFE3E1;text-align:center;font-size:16px}
+.dots{display:flex;gap:16px;padding:4px 0}.dots i{width:18px;height:18px;border-radius:50%;border:2px solid #CFE3E1}.dots i.on{background:#fff;border-color:#fff}
+.login label{display:flex;flex-direction:column;gap:6px;width:100%;max-width:300px;font-size:14px;color:#CFE3E1}
+.login input{height:48px;border-radius:12px;border:0;padding:0 16px;font-size:18px;font-weight:700;color:#17302F;background:#fff;width:100%}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:300px}
+.pad button{height:56px;border-radius:14px;border:0;background:#1B6468;color:#fff;font-size:24px;font-weight:700}
+.pad button.t{background:transparent;color:#CFE3E1;font-size:15px}
+.login .go{width:100%;max-width:300px;height:56px;border-radius:14px;border:0;background:#F2B544;color:#2A1B00;font-size:18px;font-weight:800}
+.err{color:#FFD3CF;font-weight:700;min-height:20px;text-align:center}
+.banner{background:#FFF1D6;border:1px solid #E8B65A;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.35;color:#5A3A00}
+.sec h2{margin:0 0 8px;font-size:15px;color:#55625F;font-weight:700}
+.sec p{margin:0 0 8px;font-size:13px;color:#55625F;line-height:1.4}
+.btns{display:flex;gap:8px}.btns .btn{flex:1}
+.toast{position:absolute;left:12px;right:12px;bottom:84px;background:#17302F;color:#fff;border-radius:12px;padding:12px 14px;font-size:15px;font-weight:700;text-align:center;z-index:9}
+.modal{position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+.modal .box{background:#fff;border-radius:16px;padding:18px;width:100%;display:flex;flex-direction:column;gap:14px}
+.modal .box h3{margin:0;font-size:20px}.modal .box p{margin:0;font-size:15px;line-height:1.4;color:#33423F}
+.empty{text-align:center;color:#55625F;padding:30px 10px;font-size:15px}
+.stub{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#55625F;padding:30px;text-align:center}
+.stub b{font-size:18px;color:#1B2B2A}
+.mrow{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:60px;background:#fff;border:1px solid #DCE3E1;border-radius:14px;padding:10px 14px;text-align:left;color:inherit}
+.mrow b{display:block;font-size:16px}.mrow small{display:block;font-size:12px;color:#55625F;margin-top:2px}
+.hrow{display:grid;grid-template-columns:52px 1fr 1fr 1fr;gap:6px;padding:11px 12px;border-top:1px solid #E7ECEA;font-size:13px;text-align:right;align-items:start}
+.hrow>span:first-child{text-align:left}.hrow small{display:block;font-size:11px;color:#55625F;font-weight:400}
+.hrow.hh{background:#E3F0EE;font-weight:800;color:#0F4C4F;border-top:0;font-size:12px}
+.hrow .neg{color:#1E7A46}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rline{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;font-size:15px;border-top:1px solid #EEF2F0}
+.rline:first-of-type{border-top:0}.rline.big{font-size:17px;font-weight:800}
+.card.res{background:#E3F0EE;border:2px solid #0F4C4F}
+.card.res .rline{border-top:1px solid #C5DAD7}.card.res .rline:first-of-type{border-top:0}
+.bdg{border-radius:999px;padding:4px 12px;font-size:14px;font-weight:800;white-space:nowrap}
+.bdg.okb{background:#1E7A46;color:#fff}.bdg.warn{background:#FFF1D6;color:#5A3A00;border:1px solid #E8B65A}
+.sec .rline b{font-size:15px}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:15px}.chk input{width:24px;height:24px;margin-top:2px;flex:none}.chk small{display:block;font-size:12px;color:#55625F;font-weight:400}
+.search{flex-wrap:wrap}.search input{flex:1 1 100%}.search .btn{flex:1}
+.f input:disabled{background:#EEF2F0;color:#55625F;opacity:1;border-color:#C9D3D0}.lockb{display:block;width:100%;text-align:left;font-size:15px}.lockb small{display:block;margin-top:2px;font-size:12px}
+.resu{white-space:pre-wrap;word-break:break-word;font:14px/1.55 ui-monospace,Menlo,Consolas,monospace;background:#fff;border:1px solid #DCE3E1;border-radius:14px;padding:14px;margin:0;color:#1B2B2A}
+.foot{flex-wrap:wrap}.foot .tots{display:flex;gap:6px;width:100%}.foot .tots .t{flex:1;min-width:0;font-size:11px;font-weight:700;letter-spacing:.2px}.foot .tots .t b{font-size:13px;overflow:hidden;text-overflow:ellipsis}.foot .btn{flex:1}
+.zona{padding:14px;border-left-width:6px}.zona .ztit{font-size:12px;font-weight:800;letter-spacing:.6px;margin-bottom:8px}
+.zt{border-left-color:#0F4C4F;background:#EAF3F2}.zt .ztit{color:#0F4C4F}.zc{border-left-color:#B7791F;background:#FFF8E8}.zc .ztit{color:#8A5A0B}
+.det summary{font-weight:700;cursor:pointer;padding:4px 0}.dtab{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}.dtab th{text-align:right;color:#55625F;font-weight:700;padding:4px 2px}.dtab td{text-align:right;padding:5px 2px;border-top:1px solid #EEF2F0}.dtab th:first-child,.dtab td:first-child{text-align:left}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.pg{border-left:6px solid #C9D3D0}.pg.verde{border-left-color:#1E7A46}.pg.amar{border-left-color:#B7791F;background:#FFF8E8}.pg.rojo{border-left-color:#B3261E;background:#FDECEA}.pg.om{opacity:.6}
+.pg .pgh{display:flex;justify-content:space-between;gap:10px}.pg small{display:block;color:#55625F;margin:2px 0}.pg select{width:100%;height:44px;margin-top:6px;border-radius:10px;border:1px solid #C9D3D0;padding:0 8px;background:#fff;font-size:15px}
+
+</style>
 </head>
 <body>
 <div id="app"></div>
-<script src="logic.js"></script>
-<script src="xlsx.js"></script>
-<script src="app.js"></script>
+<script>
+'use strict';
+// Lógica de cuentas (sin pantalla). Se puede probar sola.
+(function (root) {
+  const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+  // "1.234,56" -> 1234.56
+  function parseAR(s) {
+    if (typeof s === 'number') return r2(s);
+    let t = String(s == null ? '' : s).trim().replace(/\s/g, '');
+    if (!t) return 0;
+    let neg = false;
+    if (t[0] === '-') { neg = true; t = t.slice(1); }
+    t = t.replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(t);
+    if (isNaN(n)) return NaN;
+    return r2(neg ? -n : n);
+  }
+
+  // 1234.56 -> "1.234,56"
+  function fmtAR(n) {
+    const v = r2(n);
+    const neg = v < 0;
+    const [ent, dec] = Math.abs(v).toFixed(2).split('.');
+    return (neg ? '-' : '') + ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + dec;
+  }
+
+  const KEYS = ['compra', 'efectivo1', 'efectivo2', 'mercadopago', 'transferencia', 'ajuste'];
+
+  // Cuánto cambia el saldo en un día: compra - pagos + ajuste
+  function mov(t) {
+    if (!t) return 0;
+    return r2((t.compra || 0) - (t.efectivo1 || 0) - (t.efectivo2 || 0) -
+      (t.mercadopago || 0) - (t.transferencia || 0) + (t.ajuste || 0));
+  }
+
+  // Saldo de un cliente hasta una fecha (incluida o no)
+  function saldoHasta(db, cid, fecha, incluir) {
+    const c = db.clients.find((x) => x.id === cid);
+    let s = c ? Number(c.saldoInicial) || 0 : 0;
+    for (const d of Object.keys(db.allTxns)) {
+      if (d > fecha || (!incluir && d === fecha)) continue;
+      s += mov(db.allTxns[d][cid]);
+    }
+    return r2(s);
+  }
+
+  function totalesDia(db, fecha) {
+    const out = { compras: 0, efectivo1: 0, efectivo2: 0, mercadopago: 0, transferencia: 0, ajuste: 0 };
+    const d = db.allTxns[fecha] || {};
+    for (const cid of Object.keys(d)) {
+      if (cid === '__meta__') continue;
+      for (const k of KEYS) out[k === 'compra' ? 'compras' : k] += d[cid][k] || 0;
+    }
+    for (const k of Object.keys(out)) out[k] = r2(out[k]);
+    return out;
+  }
+
+  // ---- Arqueo ----
+  // dg = efectivo cobrado - depositado general - retiro NF ; d1/d2 = efectivo del cobrador - lo que depositó
+  // (positivo = falta depositar, negativo = sobra)
+  function arqueoDia(db, f, rec) {
+    rec = rec || (db.arqueo && db.arqueo[f]) || {};
+    const t = totalesDia(db, f);
+    return {
+      t,
+      dg: r2(t.efectivo1 + t.efectivo2 - (rec.depositadoGeneral || 0) - (rec.retiroNF || 0)),
+      d1: r2(t.efectivo1 - (rec.depositado1 || 0)),
+      d2: r2(t.efectivo2 - (rec.depositado2 || 0))
+    };
+  }
+  function arqueoAcum(db, f, incluir) {
+    const b = db.baseSemana || {};
+    const out = { g: Number(b.arqueo) || 0, c1: Number(b.arqueo1) || 0, c2: Number(b.arqueo2) || 0 };
+    for (const d of Object.keys(db.arqueo || {})) {
+      if (d > f || (!incluir && d === f)) continue;
+      const x = arqueoDia(db, d);
+      out.g += x.dg; out.c1 += x.d1; out.c2 += x.d2;
+    }
+    return { g: r2(out.g), c1: r2(out.c1), c2: r2(out.c2) };
+  }
+
+  // ---- Logística ----
+  // dif = (efectivo + MP + transferencia de ayer + corrección) - pagos afectados
+  function difLog(rec) {
+    rec = rec || {};
+    return r2((rec.efectivoAyer || 0) + (rec.mercadopagoAyer || 0) + (rec.transferenciaAyer || 0) + (rec.correccion || 0) - (rec.pagosAfectado || 0));
+  }
+  function logAcum(db, f, incluir) {
+    let s = Number((db.baseSemana || {}).logistica) || 0;
+    for (const d of Object.keys(db.logisticaTxns || {})) {
+      if (d > f || (!incluir && d === f)) continue;
+      s += difLog(db.logisticaTxns[d]);
+    }
+    return r2(s);
+  }
+  const prevDate = (keys, f) => keys.filter((d) => d < f).sort().pop() || null;
+  function sugLogistica(db, f) {
+    const pt = prevDate(Object.keys(db.allTxns || {}).filter((d) => Object.keys(db.allTxns[d]).some((k) => k !== '__meta__')), f);
+    const pa = prevDate(Object.keys(db.arqueo || {}), f);
+    const t = pt ? totalesDia(db, pt) : { mercadopago: 0, transferencia: 0 };
+    return { efectivoAyer: pa ? r2(db.arqueo[pa].depositadoGeneral || 0) : 0, mercadopagoAyer: t.mercadopago, transferenciaAyer: t.transferencia, fechaCobro: pt, fechaArqueo: pa };
+  }
+
+  // ---- Limpieza de historial viejo ----
+  // Todo lo anterior al día de corte se borra. Antes se calcula la "foto" (saldos y acumulados)
+  // y se guarda como punto de partida; recién después se borran los días viejos.
+  function resumenCorte(db, corte) {
+    const antes = (o) => Object.keys(o || {}).filter((d) => d < corte).sort();
+    const t = antes(db.allTxns), a = antes(db.arqueo), l = antes(db.logisticaTxns);
+    const todos = Array.from(new Set(t.concat(a, l))).sort();
+    const quedan = Array.from(new Set(Object.keys(db.allTxns || {}).concat(Object.keys(db.arqueo || {}), Object.keys(db.logisticaTxns || {})).filter((d) => d >= corte))).length;
+    return { borrar: todos.length, desde: todos[0] || null, hasta: todos[todos.length - 1] || null, quedan,
+      arq: arqueoAcum(db, corte, false), log: logAcum(db, corte, false) };
+  }
+  function limpiarAntes(db, corte) {
+    const saldos = db.clients.map((c) => [c, saldoHasta(db, c.id, corte, false)]);
+    const ar = arqueoAcum(db, corte, false), lg = logAcum(db, corte, false);
+    saldos.forEach(([c, s]) => { c.saldoInicial = s; c.saldoDesde = corte; });
+    db.baseSemana = Object.assign({}, db.baseSemana, { desde: corte, arqueo: ar.g, arqueo1: ar.c1, arqueo2: ar.c2, logistica: lg, cerradaEl: new Date().toISOString() });
+    for (const k of ['allTxns', 'arqueo', 'logisticaTxns']) for (const d of Object.keys(db[k] || {})) if (d < corte) delete db[k][d];
+    if (db.undo && db.undo.fecha < corte) delete db.undo;
+    return db;
+  }
+
+  // ---- Pasar datos entre celulares ----
+  const tieneDatos = (t) => !!t && KEYS.some((k) => (t[k] || 0) !== 0);
+  const iguales = (a, b) => KEYS.every((k) => r2((a || {})[k] || 0) === r2((b || {})[k] || 0));
+  const IGUALES_AR = ['depositadoGeneral', 'depositado1', 'depositado2', 'retiroNF'];
+  const IGUALES_LG = ['efectivoAyer', 'mercadopagoAyer', 'transferenciaAyer', 'pagosAfectado', 'correccion'];
+  const mismo = (a, b, ks) => ks.every((k) => r2((a || {})[k] || 0) === r2((b || {})[k] || 0));
+  const algo = (o, ks) => !!o && ks.some((k) => (o[k] || 0) !== 0);
+
+  // Lo que manda el empleado: lo cargado ese día.
+  function armarCierre(db, f, de) {
+    const dia = {}, nombres = {};
+    const d = (db.allTxns || {})[f] || {};
+    for (const cid of Object.keys(d)) {
+      if (cid === '__meta__' || !tieneDatos(d[cid])) continue;
+      dia[cid] = {}; KEYS.forEach((k) => { dia[cid][k] = d[cid][k] || 0; });
+      const c = db.clients.find((x) => x.id === cid); nombres[cid] = c ? c.name : cid;
+    }
+    const ar = (db.arqueo || {})[f], lg = (db.logisticaTxns || {})[f];
+    return { tipo: 'cierre-r284', version: 1, fecha: f, de: de || '', creadoEl: new Date().toISOString(), dia, nombres,
+      arqueo: algo(ar, IGUALES_AR) ? ar : null, logistica: algo(lg, IGUALES_LG) ? lg : null };
+  }
+
+  // Suma el cierre del empleado a los datos del titular. Si ya había algo distinto, manda el titular.
+  function sumarCierre(db, c, aplicar) {
+    const f = c.fecha, r = { agregados: [], completados: [], iguales: [], conflictos: [], desconocidos: [], arqueo: '', logistica: '' };
+    const dia = (db.allTxns || {})[f] || {};
+    for (const cid of Object.keys(c.dia || {})) {
+      const nom = (c.nombres || {})[cid] || cid;
+      if (!db.clients.some((x) => x.id === cid)) { r.desconocidos.push(nom); continue; }
+      const ya = dia[cid];
+      if (!tieneDatos(ya)) { r.agregados.push(nom); if (aplicar) { if (!db.allTxns[f]) db.allTxns[f] = {}; db.allTxns[f][cid] = KEYS.reduce((o, k) => { o[k] = c.dia[cid][k] || 0; return o; }, {}); } }
+      else if (iguales(ya, c.dia[cid])) r.iguales.push(nom);
+      else if (KEYS.some((k) => ya[k] && c.dia[cid][k] && r2(ya[k]) !== r2(c.dia[cid][k]))) r.conflictos.push(nom);
+      else if (KEYS.some((k) => !ya[k] && c.dia[cid][k])) { r.completados.push(nom); if (aplicar) KEYS.forEach((k) => { if (!ya[k]) ya[k] = c.dia[cid][k] || 0; }); }
+      else r.iguales.push(nom);
+    }
+    if (aplicar && (r.agregados.length || r.completados.length)) { const m = db.allTxns[f].__meta__; db.allTxns[f].__meta__ = m || { editadoPor: c.de, actualizadoEl: new Date().toISOString(), guardado: false }; }
+    const trat = (k, ks, nombre) => {
+      const nuevo = c[nombre === 'arqueo' ? 'arqueo' : 'logistica']; if (!nuevo) return;
+      const ya = (db[k] || {})[f];
+      if (!algo(ya, ks)) { r[nombre] = 'agregado'; if (aplicar) db[k][f] = Object.assign({}, nuevo, { editadoPor: nuevo.editadoPor || c.de, guardado: false }); }
+      else if (mismo(ya, nuevo, ks)) r[nombre] = 'igual';
+      else if (ks.some((x) => ya[x] && nuevo[x] && r2(ya[x]) !== r2(nuevo[x]))) r[nombre] = 'conflicto';
+      else if (ks.some((x) => !ya[x] && nuevo[x])) { r[nombre] = 'completado'; if (aplicar) ks.forEach((x) => { if (!ya[x]) ya[x] = nuevo[x] || 0; }); }
+      else r[nombre] = 'igual';
+    };
+    trat('arqueo', IGUALES_AR, 'arqueo'); trat('logisticaTxns', IGUALES_LG, 'logistica');
+    return r;
+  }
+
+  // Cargas de este celular que no están en un archivo del titular (para no perderlas al recibir saldos)
+  function cargasSinEnviar(db, o) {
+    let n = 0;
+    for (const f of Object.keys(db.allTxns || {})) for (const cid of Object.keys(db.allTxns[f])) {
+      if (cid === '__meta__' || !tieneDatos(db.allTxns[f][cid])) continue;
+      const otro = ((o.allTxns || {})[f] || {})[cid];
+      if (!iguales(db.allTxns[f][cid], otro)) n++;
+    }
+    return n;
+  }
+
+  // ---- Planilla de Excel (mismas hojas y columnas que la app anterior) ----
+  function filasExcel(db) {
+    const nom = (id) => { const c = db.clients.find((x) => x.id === id); return c ? c.name : id; };
+    const orden = db.clients.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'));
+    const cli = [['Cliente', 'Saldo actual', 'COMPRA ', 'A COBRAR', 'Efvo. Cobr. 1', 'MP', 'Efvo. Cobr. 2', 'AJUSTE', 'RETIRO', 'SALDO FINAL']];
+    orden.forEach((c, i) => {
+      const r = i + 2, sa = saldoHasta(db, c.id, '9999-12-31', true);
+      cli.push([c.name, sa, null, { f: 'B' + r + '+C' + r, v: sa }, null, null, null, null, null, { f: 'D' + r + '-E' + r + '-F' + r + '-G' + r + '-H' + r + '-I' + r, v: sa }]);
+    });
+    const hist = [['Fecha', 'Cliente', 'Saldo anterior', 'Compra', 'Efvo Cobrador 1', 'Efvo Cobrador 2', 'MercadoPago', 'Transferencia', 'Ajuste', 'Saldo final']];
+    const corr = {}; db.clients.forEach((c) => { corr[c.id] = Number(c.saldoInicial) || 0; });
+    for (const d of Object.keys(db.allTxns || {}).sort()) {
+      const dia = db.allTxns[d], ids = Object.keys(dia).filter((k) => k !== '__meta__').sort((a, b) => String(nom(a)).localeCompare(String(nom(b)), 'es'));
+      for (const cid of ids) {
+        const t = dia[cid], ant = r2(corr[cid] || 0); corr[cid] = r2(ant + mov(t));
+        if (tieneDatos(t)) hist.push([d, nom(cid), ant, t.compra || 0, t.efectivo1 || 0, t.efectivo2 || 0, t.mercadopago || 0, t.transferencia || 0, t.ajuste || 0, corr[cid]]);
+      }
+    }
+    const arq = [['Fecha', 'Depositado general', 'Depósito cobrador 1', 'Depósito cobrador 2', 'Retiro NF']];
+    for (const d of Object.keys(db.arqueo || {}).sort()) { const r = db.arqueo[d]; arq.push([d, r.depositadoGeneral || 0, r.depositado1 || 0, r.depositado2 || 0, r.retiroNF || 0]); }
+    const log = [['Fecha', 'Efectivo (ayer)', 'MercadoPago (ayer)', 'Transferencia (ayer)', 'Total', 'Pagos afectado LLSSA', 'Diferencia', 'Corrección', 'Acumulado']];
+    let ac = Number((db.baseSemana || {}).logistica) || 0;
+    for (const d of Object.keys(db.logisticaTxns || {}).sort()) {
+      const r = db.logisticaTxns[d]; if (!algo(r, IGUALES_LG)) continue;
+      const tot = r2((r.efectivoAyer || 0) + (r.mercadopagoAyer || 0) + (r.transferenciaAyer || 0)), dif = r2(tot - (r.pagosAfectado || 0));
+      ac = r2(ac + dif + (r.correccion || 0));
+      log.push([d, r.efectivoAyer || 0, r.mercadopagoAyer || 0, r.transferenciaAyer || 0, tot, r.pagosAfectado || 0, dif, r.correccion || 0, ac]);
+    }
+    return [{ name: 'Clientes', rows: cli }, { name: 'Historial clientes', rows: hist }, { name: 'Arqueo', rows: arq }, { name: 'Logística', rows: log }];
+  }
+
+  // El empleado recibe los datos del titular. El titular manda en los días ya guardados;
+  // lo que el empleado cargó en días sin guardar (o que el titular no tiene) se conserva.
+  function recibirDatos(db, o, aplicar) {
+    const cp = (x) => JSON.parse(JSON.stringify(x || {}));
+    const nuevo = { clients: cp(o.clients).length ? JSON.parse(JSON.stringify(o.clients)) : [], allTxns: cp(o.allTxns), arqueo: cp(o.arqueo), logisticaTxns: cp(o.logisticaTxns),
+      baseSemana: o.baseSemana ? cp(o.baseSemana) : cp(db.baseSemana), notas: Array.isArray(o.notas) ? cp(o.notas) : [] };
+    const desde = (nuevo.baseSemana && nuevo.baseSemana.desde) || '';
+    const abierto = (m) => !m || m.guardado === false;       // día sin guardar
+    const r = { conservadas: 0, reemplazadas: 0 };
+    for (const f of Object.keys(db.allTxns || {})) {
+      if (desde && f < desde) continue;
+      const mio = db.allTxns[f], suyo = nuevo.allTxns[f];
+      for (const cid of Object.keys(mio)) {
+        if (cid === '__meta__' || !tieneDatos(mio[cid])) continue;
+        const s = suyo && suyo[cid];
+        if (suyo && !abierto(suyo.__meta__)) { if (!iguales(mio[cid], s)) r.reemplazadas++; continue; }
+        if (!tieneDatos(s)) { if (!nuevo.allTxns[f]) nuevo.allTxns[f] = {}; nuevo.allTxns[f][cid] = JSON.parse(JSON.stringify(mio[cid])); if (!nuevo.allTxns[f].__meta__ && mio.__meta__) nuevo.allTxns[f].__meta__ = JSON.parse(JSON.stringify(mio.__meta__)); r.conservadas++; }
+      }
+    }
+    for (const [k, ks] of [['arqueo', IGUALES_AR], ['logisticaTxns', IGUALES_LG]]) for (const f of Object.keys(db[k] || {})) {
+      if (desde && f < desde) continue;
+      const mio = db[k][f], suyo = nuevo[k][f];
+      if (!algo(mio, ks)) continue;
+      if (!algo(suyo, ks)) { nuevo[k][f] = JSON.parse(JSON.stringify(mio)); r.conservadas++; }
+      else if (!mismo(mio, suyo, ks) && suyo.guardado !== false) r.reemplazadas++;
+    }
+    if (aplicar) { db.clients = nuevo.clients; db.allTxns = nuevo.allTxns; db.arqueo = nuevo.arqueo; db.logisticaTxns = nuevo.logisticaTxns; db.baseSemana = nuevo.baseSemana;
+      const vistos = new Set(nuevo.notas.map((n) => n.fecha + '|' + n.texto + '|' + n.usuario)); (db.notas || []).forEach((n) => { if (!vistos.has(n.fecha + '|' + n.texto + '|' + n.usuario)) nuevo.notas.push(n); }); db.notas = nuevo.notas; }
+    return r;
+  }
+
+  // ---- Resumen del día y Retiros del mes ----
+  const fmtD = (f) => f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4);
+  const mon = (n) => '$' + fmtAR(n);
+  function textoResumen(db, f) {
+    const t = totalesDia(db, f), a = arqueoDia(db, f), rec = (db.arqueo || {})[f] || {}, lg = (db.logisticaTxns || {})[f] || {};
+    const cob = r2(t.efectivo1 + t.efectivo2 + t.mercadopago + t.transferencia);
+    const ayer = r2((lg.efectivoAyer || 0) + (lg.mercadopagoAyer || 0) + (lg.transferenciaAyer || 0)), af = r2(lg.pagosAfectado || 0);
+    const ac = arqueoAcum(db, f, true), la = logAcum(db, f, true);
+    const L_ = ['RESUMEN DEL DÍA — ' + fmtD(f), '',
+      'Compras: ' + mon(t.compras), 'Cobranzas general: ' + mon(cob), 'Total recaudado — Pago 1: ' + mon(t.efectivo1), 'Total recaudado — Pago 2: ' + mon(t.efectivo2),
+      'Total recaudado — MercadoPago: ' + mon(t.mercadopago), 'Transferencias: ' + mon(t.transferencia), '',
+      'ARQUEO', 'Depositado: ' + mon(rec.depositadoGeneral || 0), 'Diferencia: ' + mon(a.dg),
+      'Cobrador 1 — Recaudado: ' + mon(t.efectivo1), 'Cobrador 1 — Depositado: ' + mon(rec.depositado1 || 0), 'Cobrador 1 — Diferencia: ' + mon(a.d1),
+      'Cobrador 2 — Recaudado: ' + mon(t.efectivo2), 'Cobrador 2 — Depositado: ' + mon(rec.depositado2 || 0), 'Cobrador 2 — Diferencia: ' + mon(a.d2),
+      'Retiro no facturado: ' + mon(rec.retiroNF || 0), 'Diferencia acumulada: ' + mon(ac.g), '',
+      'LOGÍSTICA', 'Rendido ayer: ' + mon(ayer), 'Afectado hoy: ' + mon(af), 'Diferencia: ' + mon(r2(ayer - af))];
+    if (lg.correccion) L_.push('Corrección: ' + mon(lg.correccion));
+    L_.push('Diferencia acumulada: ' + mon(la));
+    return L_.join('\n');
+  }
+  const normN = (s) => String(s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const RETIRO_CLIENTES = ['ROKE', 'NICOLAS'];
+  // Retiros de un mes ('2026-10'): retiro no facturado del Arqueo + ajustes cargados en ROKE y NICOLAS.
+  function retirosMes(db, ym) {
+    const ids = {}; db.clients.forEach((c) => { if (RETIRO_CLIENTES.includes(normN(c.name))) ids[c.id] = c.name; });
+    const dias = new Set(Object.keys(db.arqueo || {}).concat(Object.keys(db.allTxns || {})).filter((d) => d.slice(0, 7) === ym));
+    const filas = []; let total = 0;
+    Array.from(dias).sort().forEach((d) => {
+      const nf = r2(((db.arqueo || {})[d] || {}).retiroNF || 0); const aj = [];
+      for (const cid of Object.keys(ids)) { const x = r2((((db.allTxns || {})[d] || {})[cid] || {}).ajuste || 0); if (x) aj.push({ nombre: ids[cid], monto: x }); }
+      const tot = r2(nf + aj.reduce((a, b) => a + b.monto, 0));
+      if (nf || aj.length) { filas.push({ fecha: d, nf, ajustes: aj, total: tot }); total = r2(total + tot); }
+    });
+    return { total, filas };
+  }
+
+  function diaAnterior(f) { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  // Día por día: lo cobrado en efectivo, lo depositado (general + retiro NF), la diferencia y el acumulado general.
+  function detalleArqueo(db) {
+    let ac = Number((db.baseSemana || {}).arqueo) || 0;
+    return Object.keys(db.arqueo || {}).sort().map((f) => {
+      const x = arqueoDia(db, f), r = db.arqueo[f];
+      ac = r2(ac + x.dg);
+      return { fecha: f, cobrado: r2(x.t.efectivo1 + x.t.efectivo2), depositado: r2((r.depositadoGeneral || 0) + (r.retiroNF || 0)), dif: x.dg, acum: ac };
+    });
+  }
+
+  // ---- Pegar lista (cliente;monto) leída de una foto por otra IA ----
+  const normNom = (x) => String(x == null ? '' : x).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]+/g, ' ').trim();
+  function numLista(tok) {
+    let t = String(tok).replace(/[$\s]/g, '');
+    if (!/\d/.test(t)) return NaN;
+    if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+    else if (!/^-?\d+\.\d{1,2}$/.test(t)) t = t.replace(/\./g, '');
+    const n = Number(t);
+    return isFinite(n) ? r2(n) : NaN;
+  }
+  // Devuelve { filas:[{linea,nombre,monto}], ignoradas:[texto], totalDeclarado }
+  function leerLista(texto) {
+    const filas = [], ignoradas = []; let totalDeclarado = null;
+    String(texto || '').split(/\r?\n/).forEach((raw) => {
+      const linea = raw.replace(/^[\s\-*•·>]+/, '').trim();
+      if (!linea) return;
+      if (/^```/.test(linea) || /^(nombre|cliente)\s*[;:|\t]\s*monto/i.test(linea)) return;
+      const m = linea.match(/^(.*?)[\s;:|\t]*(-?\s*\$?\s*-?\d[\d.,]*)\s*$/);
+      if (!m) { ignoradas.push(linea); return; }
+      const monto = numLista(m[2]);
+      let nombre = m[1].replace(/[;:|\t]+/g, ' ').replace(/^\d+\s*[.)\-]?\s+(?=\D)/, '').replace(/\$/g, '').replace(/\s+/g, ' ').trim();
+      if (isNaN(monto)) { ignoradas.push(linea); return; }
+      if (normNom(nombre) === 'TOTAL') { totalDeclarado = monto; return; }
+      if (!nombre) { ignoradas.push(linea); return; }
+      filas.push({ linea, nombre, monto });
+    });
+    return { filas, ignoradas, totalDeclarado };
+  }
+  function lev(a, b) {
+    const d = []; for (let i = 0; i <= a.length; i++) { d[i] = [i]; } for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  // Busca el cliente. exacto = mismo nombre; parecido = una sola opción cercana; null = no se pudo identificar.
+  function buscarCliente(clients, nombre) {
+    const n = normNom(nombre); if (!n) return null;
+    const lista = clients.map((c) => ({ c, n: normNom(c.name) }));
+    const ex = lista.filter((x) => x.n === n);
+    if (ex.length === 1) return { id: ex[0].c.id, tipo: 'exacto' };
+    if (ex.length > 1) return null;
+    const dist = lista.map((x) => ({ x, d: lev(n, x.n) })).sort((p, q) => p.d - q.d);
+    const lim = n.length >= 9 ? 2 : n.length >= 5 ? 1 : 0;
+    if (dist.length && dist[0].d <= lim && (dist.length < 2 || dist[1].d > dist[0].d)) return { id: dist[0].x.c.id, tipo: 'parecido' };
+    const cont = lista.filter((x) => x.n.length >= 4 && n.length >= 4 && (' ' + x.n + ' ').indexOf(' ' + n + ' ') >= 0 || (' ' + n + ' ').indexOf(' ' + x.n + ' ') >= 0 && x.n.length >= 4);
+    if (cont.length === 1) return { id: cont[0].c.id, tipo: 'parecido' };
+    return null;
+  }
+  // Arma la pantalla de revisión: cada fila con su cliente (o sin identificar).
+  function armarLista(db, texto, campo, fecha) {
+    const r = leerLista(texto), activos = db.clients;
+    const filas = r.filas.map((f) => {
+      const b = buscarCliente(activos, f.nombre);
+      return { nombre: f.nombre, monto: f.monto, id: b ? b.id : null, estado: b ? b.tipo : 'sin' };
+    });
+    return { filas, ignoradas: r.ignoradas, totalDeclarado: r.totalDeclarado, campo, fecha };
+  }
+  // Aplica una lista revisada. Suma si el mismo cliente aparece en varias filas. Devuelve lo cargado.
+  function aplicarLista(db, lista, setVal) {
+    const por = {};
+    lista.filas.forEach((f) => { if (f.id && f.estado !== 'omitir') por[f.id] = r2((por[f.id] || 0) + f.monto); });
+    Object.keys(por).forEach((id) => setVal(lista.fecha, id, lista.campo, por[id]));
+    return { clientes: Object.keys(por).length, total: r2(Object.values(por).reduce((a, b) => a + b, 0)) };
+  }
+
+  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes, diaAnterior, detalleArqueo, leerLista, buscarCliente, armarLista, aplicarLista, normNom };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.R284 = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+'use strict';
+// Arma un archivo .xlsx (Excel) sin librerías y sin internet.
+(function (root) {
+  const enc = new TextEncoder();
+  const crcT = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  const crc32 = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const xe = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  const col = (i) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+
+  function sheetXML(rows) {
+    const out = rows.map((r, ri) => '<row r="' + (ri + 1) + '">' + r.map((v, ci) => {
+      const ref = col(ci) + (ri + 1);
+      if (v === null || v === undefined || v === '') return '';
+      if (v && typeof v === 'object' && v.f) return '<c r="' + ref + '" s="2"><f>' + xe(v.f) + '</f><v>' + (Number(v.v) || 0) + '</v></c>';
+      if (typeof v === 'number') return '<c r="' + ref + '" s="' + (ri === 0 ? 1 : 2) + '"><v>' + v + '</v></c>';
+      return '<c r="' + ref + '" t="inlineStr" s="' + (ri === 0 ? 1 : 0) + '"><is><t xml:space="preserve">' + xe(v) + '</t></is></c>';
+    }).join('') + '</row>').join('');
+    const n = (rows[0] || []).length;
+    const cols = '<cols>' + Array.from({ length: n }, (_, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + (i === 0 || i === 1 ? 20 : 16) + '" customWidth="1"/>').join('') + '</cols>';
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' + cols + '<sheetData>' + out + '</sheetData></worksheet>';
+  }
+
+  function zipStore(files) {
+    const parts = [], cen = []; let off = 0;
+    const u16 = (n) => [n & 255, (n >>> 8) & 255], u32 = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+    for (const f of files) {
+      const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      const head = [0x50, 0x4B, 3, 4, 20, 0, 0, 8, 0, 0, 0, 0x21, 0, 0x21, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), 0, 0];
+      parts.push(new Uint8Array(head), name, data);
+      cen.push(new Uint8Array([0x50, 0x4B, 1, 2, 20, 0, 20, 0, 0, 8, 0, 0, 0, 0x21, 0, 0x21, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...u32(off)]), name);
+      off += head.length + name.length + data.length;
+    }
+    const csize = cen.reduce((a, b) => a + b.length, 0);
+    const end = new Uint8Array([0x50, 0x4B, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length), ...u32(csize), ...u32(off), 0, 0]);
+    const all = parts.concat(cen, [end]); const tot = all.reduce((a, b) => a + b.length, 0);
+    const res = new Uint8Array(tot); let p = 0; for (const a of all) { res.set(a, p); p += a.length; }
+    return res;
+  }
+
+  // sheets: [{ name, rows: [[...], ...] }]  (la primera fila es el título)
+  function makeXlsx(sheets) {
+    const H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const files = [
+      { name: '[Content_Types].xml', data: H + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + sheets.map((s, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('') + '</Types>' },
+      { name: '_rels/.rels', data: H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: 'xl/workbook.xml', data: H + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + sheets.map((s, i) => '<sheet name="' + xe(s.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>' },
+      { name: 'xl/_rels/workbook.xml.rels', data: H + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheets.map((s, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('') + '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: 'xl/styles.xml', data: H + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3F0EE"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' }
+    ].concat(sheets.map((s, i) => ({ name: 'xl/worksheets/sheet' + (i + 1) + '.xml', data: sheetXML(s.rows) })));
+    return zipStore(files);
+  }
+  const api = { makeXlsx, crc32 };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.R284X = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+'use strict';
+(function () {
+  const root = window;
+  const VERSION = 15;
+  const L = window.R284;
+  const KEY = 'r284.v1';
+  const NAMEKEY = 'r284.nombre';
+  const app = document.getElementById('app');
+
+  // ---------- Datos (se guardan en el celular) ----------
+  const blank = () => ({
+    clients: [], allTxns: {}, arqueo: {}, logisticaTxns: {},
+    baseSemana: { desde: '', logistica: 0, arqueo: 0, arqueo1: 0, arqueo2: 0, cerradaEl: '' },
+    notas: [], config: { pinHash: '' }
+  });
+  function loadDB() {
+    try { const r = localStorage.getItem(KEY); if (r) return Object.assign(blank(), JSON.parse(r)); } catch (e) {}
+    return blank();
+  }
+  let DB = loadDB();
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
+    catch (e) { toast('No se pudo guardar en el celular. Hacé un respaldo y avisá.', 5000); return false; }
+  }
+
+  // ---------- Estado de pantalla ----------
+  let hoyVisto = null;
+  const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const today = () => ymd(new Date());
+  const shiftDay = (f, n) => { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
+  const dateObj = (f) => new Date(f + 'T12:00:00');
+  const S = {
+    logged: false, stage: DB.config.pinHash ? 'entrar' : 'crear', buf: '', first: '', msg: '',
+    name: localStorage.getItem(NAMEKEY) || '',
+    tab: 'cierre', sub: null, fecha: today(), q: '', solo: false, open: null, modal: null, toastMsg: '',
+    titularUntil: 0, selCli: null, hq: '', edit: null, verInact: false, rJ: true, rX: true,
+    todos: (function () { try { return localStorage.getItem('r284.todos') !== '0'; } catch (e) { return true; } })()
+  };
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const norm = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const cls = (n) => (Math.abs(n) < 0.005 ? 'zero' : n > 0 ? 'pos' : 'neg');
+
+  let toastTimer = null, toastUntil = 0;
+  function showToast() {
+    const old = document.getElementById('toast');
+    if (old) old.remove();
+    if (Date.now() >= toastUntil) return;
+    const el = document.createElement('div');
+    el.className = 'toast'; el.id = 'toast'; el.setAttribute('role', 'status'); el.textContent = S.toastMsg;
+    app.appendChild(el);
+  }
+  function toast(msg, ms) {
+    S.toastMsg = msg; toastUntil = Date.now() + (ms || 2200);
+    showToast();
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(showToast, (ms || 2200) + 20);
+  }
+
+  async function hashPin(p) {
+    try {
+      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('r284:' + p));
+      return Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+      let h = 5381; const s = 'r284:' + p;
+      for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+      return 'x' + h;
+    }
+  }
+
+  // ---------- Datos del día ----------
+  function setVal(f, cid, k, v) {
+    if (!DB.allTxns[f]) DB.allTxns[f] = {};
+    const day = DB.allTxns[f];
+    if (!day[cid]) day[cid] = { compra: 0, efectivo1: 0, efectivo2: 0, mercadopago: 0, transferencia: 0, ajuste: 0 };
+    day[cid][k] = v;
+    if (L.KEYS.every((x) => !day[cid][x])) delete day[cid];
+    day.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: false };
+    persist();
+  }
+  // Un día "guardado" queda bloqueado. Los días de la app anterior (con sello y sin la marca) también.
+  const diaMeta = (f) => (DB.allTxns[f] && DB.allTxns[f].__meta__) || null;
+  const diaBloqueado = (f) => { const m = diaMeta(f); return !!m && m.guardado !== false; };
+  const recBloq = (rec) => !!rec && rec.guardado !== false;
+  function bannerBloq(rec, accion) {
+    const d = rec.actualizadoEl ? new Date(rec.actualizadoEl) : null;
+    const cuando = d && !isNaN(d) ? d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    return `<button class="banner lockb" data-a="${accion}"><b>🔒 Guardado — destrabar</b><small>${esc(rec.editadoPor || '')}${cuando ? ' · ' + esc(cuando) : ''}</small></button>`;
+  }
+  const getT = (f, cid) => (DB.allTxns[f] && DB.allTxns[f][cid]) || null;
+
+  // ---------- Pantallas ----------
+  const ICON = {
+    cierre: '<path d="M7 4h10v16H7z"/><path d="M10 9h4M10 13h4"/>',
+    arqueo: '<path d="M3 10l9-6 9 6"/><path d="M5 10v8M10 10v8M14 10v8M19 10v8M3 20h18"/>',
+    logistica: '<path d="M2 7h11v9H2zM13 10h4l3 3v3h-7"/><circle cx="6" cy="17" r="1.6"/><circle cx="16" cy="17" r="1.6"/>',
+    clientes: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 3-5.5 6-5.5s6 2 6 5.5"/><path d="M16 5.5a3 3 0 010 5.5M18 14.5c2 .7 3 2.4 3 5.5"/>',
+    mas: '<path d="M4 7h16M4 12h16M4 17h16"/>'
+  };
+  const TABS = [['cierre', 'Cierre'], ['arqueo', 'Arqueo'], ['logistica', 'Logística'], ['mas', 'Más']];
+  const nav = () => '<nav class="nav" aria-label="Pantallas">' + TABS.map(([k, n]) =>
+    `<button data-a="tab" data-v="${k}" class="${S.tab === k ? 'act' : ''}"${S.tab === k ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>${n}</button>`).join('') + '</nav>';
+
+  function header(titulo, conFecha) {
+    let lab = dateObj(S.fecha).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    lab = lab.charAt(0).toUpperCase() + lab.slice(1);
+    return `<header class="hdr"><div class="row"><h1>${titulo}</h1><button class="chip" data-a="lock" aria-label="Bloquear la app (${esc(S.name)})">${esc(S.name)} · Bloquear</button></div>` +
+      (conFecha ? `<div class="datebar"><button data-a="dia" data-v="-1" aria-label="Día anterior">‹</button><div class="d">${esc(lab)}</div><button data-a="dia" data-v="1" aria-label="Día siguiente">›</button></div>` : '') + '</header>';
+  }
+
+  function viewLogin() {
+    const t = S.stage === 'entrar' ? 'Escribí el PIN del equipo para entrar' : S.stage === 'crear' ? 'Primera vez: elegí un PIN de 4 números' : 'Escribilo otra vez para confirmar';
+    const dots = [0, 1, 2, 3].map((i) => `<i class="${i < S.buf.length ? 'on' : ''}"></i>`).join('');
+    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((k) => `<button data-a="key" data-v="${k}">${k}</button>`).join('');
+    return `<div class="login"><h1>APP FLET</h1>
+<p>${t}</p>
+<div class="dots" role="img" aria-label="${S.buf.length} de 4 números escritos">${dots}</div>
+<div class="err" role="alert">${esc(S.msg)}</div>
+<label>Tu nombre o iniciales (queda anotado en cada cambio)<input id="name" type="text" value="${esc(S.name)}" maxlength="12" autocomplete="off"></label>
+<div class="pad">${keys}<span></span><button data-a="key" data-v="0">0</button><button class="t" data-a="back" aria-label="Borrar">BORRAR</button></div></div>`;
+  }
+
+  function dayTotals() { return L.totalesDia(DB, S.fecha); }
+  function cobrado(t) { return L.r2(t.efectivo1 + t.efectivo2 + t.mercadopago + t.transferencia); }
+
+  function rowHTML(c) {
+    const f = S.fecha, t = getT(f, c.id);
+    const antes = L.saldoHasta(DB, c.id, f, false);
+    const nuevo = L.r2(antes + L.mov(t));
+    if (S.open === c.id || S.todos) {
+      const fld = (k, lab, bold) => `<label class="f">${lab}<input type="text" inputmode="decimal" data-k="${k}" data-id="${c.id}" class="${t && t[k] ? 'has' : ''}" placeholder="0,00" value="${t && t[k] ? L.fmtAR(t[k]) : ''}"${diaBloqueado(f) ? ' disabled' : ''}></label>`;
+      return `<section class="card open" aria-label="${esc(c.name)}"><button class="crow" data-a="close"><span class="n">${esc(c.name)}</span><span class="s" style="margin:0">Saldo anterior ${L.fmtAR(antes)}${S.todos ? '' : ' · cerrar ▲'}</span></button>
+<div class="grid">${fld('compra', 'Compra')}${fld('efectivo1', 'Efectivo COB 1')}${fld('efectivo2', 'Efectivo COB 2')}${fld('mercadopago', 'MercadoPago')}${fld('transferencia', 'Transferencia')}${fld('ajuste', 'Ajuste (+ / −)')}</div>
+<div class="new"><span class="a">Saldo nuevo</span><span class="b ${cls(nuevo)}" id="new-${c.id}">${L.fmtAR(nuevo)}</span></div></section>`;
+    }
+    const pag = t ? L.r2(t.efectivo1 + t.efectivo2 + t.mercadopago + t.transferencia) : 0;
+    const sub = t ? `Compra ${L.fmtAR(t.compra)} · Pagos ${L.fmtAR(pag)}${t.ajuste ? ' · Ajuste ' + L.fmtAR(t.ajuste) : ''}` : 'Sin movimientos hoy';
+    return `<div class="card"><button class="crow" data-a="open" data-v="${c.id}"><span><span class="n">${esc(c.name)}</span><span class="s">${esc(sub)}</span></span><span class="sal ${cls(nuevo)}">${L.fmtAR(nuevo)}</span></button></div>`;
+  }
+
+  function listHTML() {
+    if (!DB.clients.length) return '<div class="empty">Todavía no hay clientes.<br>Andá a <b>Más</b> y tocá <b>Restaurar</b> para cargar tu respaldo.</div>';
+    const q = norm(S.q.trim());
+    const f = S.fecha;
+    const rows = DB.clients.filter((c) => c.active !== false).filter((c) => {
+      if (q && !norm(c.name).includes(q)) return false;
+      if (S.open === c.id) return true;
+      if (S.solo) return Math.abs(L.saldoHasta(DB, c.id, f, true)) >= 0.005 || !!getT(f, c.id);
+      return true;
+    });
+    if (!rows.length) return '<div class="empty">No hay clientes con ese filtro.</div>';
+    return rows.map(rowHTML).join('');
+  }
+
+  function footHTML() {
+    const t = dayTotals();
+    return `<div class="tots"><div class="t">Compras<b id="tot-compras">${L.fmtAR(t.compras)}</b></div><div class="t">EFECTIVO<b id="tot-efectivo">${L.fmtAR(L.r2(t.efectivo1 + t.efectivo2))}</b></div><div class="t">MP DÍA<b id="tot-mp">${L.fmtAR(t.mercadopago)}</b></div><div class="t">TRANSFER.<b id="tot-transf">${L.fmtAR(t.transferencia)}</b></div></div>${diaBloqueado(S.fecha) ? '<button class="btn ghost" data-a="destrabar">🔒 DESTRABAR</button>' : '<button class="btn green" data-a="guardar">GUARDAR DÍA</button>'}`;
+  }
+
+  function lockBanner() {
+    const m = diaMeta(S.fecha) || {}, d = m.actualizadoEl ? new Date(m.actualizadoEl) : null;
+    const cuando = d && !isNaN(d) ? d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+    return `<div style="padding:8px 12px 0"><button class="banner lockb" data-a="destrabar"><b>🔒 Día guardado — destrabar el día completo</b><small>${esc(m.editadoPor || '')}${cuando ? ' · ' + esc(cuando) : ''}</small></button></div>`;
+  }
+  function confirmDestrabarRec(tipo) {
+    const k = tipo === 'arqueo' ? 'arqueo' : 'logisticaTxns', nom = tipo === 'arqueo' ? 'el Arqueo' : 'la Logística';
+    S.modal = { title: '¿Destrabar ' + nom + '?', ok: 'DESTRABAR', danger: true,
+      text: `Se puede volver a editar ${nom} del <b>${esc(fechaLarga(S.fecha))}</b>. Acordate de guardar al terminar.`,
+      onOk: () => { const r = DB[k][S.fecha]; if (r) { r.guardado = false; r.editadoPor = S.name; r.actualizadoEl = new Date().toISOString(); } if (persist()) toast('Destrabado', 3000); } };
+    render();
+  }
+  function confirmDestrabar() {
+    S.modal = { title: '¿Destrabar el día completo?', ok: 'DESTRABAR', danger: true,
+      text: `Se pueden volver a editar <b>todos los clientes</b> del <b>${esc(fechaLarga(S.fecha))}</b>. Acordate de tocar GUARDAR DÍA al terminar.`,
+      onOk: () => { const m = diaMeta(S.fecha); if (m) { m.guardado = false; m.actualizadoEl = new Date().toISOString(); m.editadoPor = S.name; } if (persist()) toast('Día destrabado', 3000); } };
+    render();
+  }
+  function viewCierre() {
+    const dom = dateObj(S.fecha).getDay() === 0;
+    return header('Cierre del día', true) +
+      (dom ? '<div style="padding:8px 12px 0"><div class="banner">Es domingo: normalmente no se trabaja. Podés cargar igual si hace falta.</div></div>' : '') +
+      (diaBloqueado(S.fecha) ? lockBanner() : '') +
+      `<div class="search"><input id="q" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="btn sm ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">Con saldo</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Todos abiertos' : 'Abrir todos'}</button><button class="btn sm ghost" data-a="pg-abrir" style="flex-basis:100%">📋 Pegar lista (foto leída por Claude)</button></div>` +
+      `<div class="body" id="list">${listHTML()}</div><div class="foot" id="foot">${footHTML()}</div>` + nav();
+  }
+
+  // ---------- Pegar lista ----------
+  const PG_CAMPOS = [['compra', 'Compras'], ['mercadopago', 'MercadoPago'], ['transferencia', 'Transferencia'], ['efectivo1', 'Efectivo COB 1'], ['efectivo2', 'Efectivo COB 2']];
+  const pgNombre = (k) => (PG_CAMPOS.find((x) => x[0] === k) || [0, k])[1];
+  function pgInstrucciones(campo) {
+    const fmt = 'Respondé SOLO con una lista, un cliente por renglón, con este formato exacto: NOMBRE;MONTO (monto con coma decimal y sin el signo $, por ejemplo ACOSTA;12345,67). Usá los nombres de mi lista cuando coincidan. Al final agregá un renglón: TOTAL;suma de todos los montos.';
+    const quien = DB.clients.filter((c) => c.active !== false).map((c) => c.name).join(', ');
+    let cuerpo;
+    if (campo === 'compra') cuerpo = 'Mirá la foto de la planilla "RESUMEN DE ENTREGAS DEL DÍA" (puede estar inclinada). Para cada cliente tomá SOLO el valor de la columna TOTAL CLIENTE (está impreso en la última fila de cada cliente). Nunca uses la columna IMPORTE. Ignorá lo escrito a mano y las filas de CENCOSUD, MILLAN y CENTRAPAL. Respetá los números negativos (con -). Si un cliente aparece en varias filas, sumalas. Leé en dos listas (primero los clientes, después los documentos) para que la inclinación no te corra los renglones.';
+    else if (campo === 'mercadopago') cuerpo = 'Mirá la foto del resumen de transferencias de MercadoPago. Para cada pago recibido tomá el nombre de quien pagó y el monto. Si el mismo nombre aparece varias veces, sumalo en un solo renglón.';
+    else if (campo === 'transferencia') cuerpo = 'Mirá la foto de las transferencias bancarias recibidas. Para cada una tomá el nombre de quien pagó y el monto. Si el mismo nombre aparece varias veces, sumalo en un solo renglón.';
+    else cuerpo = 'Mirá la foto con los cobros en efectivo. Para cada cliente tomá el nombre y el monto cobrado. Si el mismo cliente aparece varias veces, sumalo en un solo renglón.';
+    return cuerpo + '\n\n' + fmt + '\n\nMi lista de clientes: ' + quien + '.';
+  }
+  function viewPegar() {
+    const P = S.pegar, f = S.fecha;
+    if (P.paso === 'revisar') return viewPegarRevisar();
+    const lk = diaBloqueado(f);
+    return subHeader('Pegar lista') + `<div class="body">
+${lk ? '<div class="banner"><b>El día ' + esc(fechaLarga(f)) + ' está guardado.</b> Volvé a Cierre y destrabalo antes de pegar una lista.</div>' : ''}
+<section class="card sec"><h2>1. ¿Qué lista es?</h2><div class="chips">${PG_CAMPOS.map((x) => `<button class="btn sm ${P.campo === x[0] ? 'on' : 'ghost'}" data-a="pg-campo" data-v="${x[0]}">${x[1]}</button>`).join('')}</div>
+<p style="margin:10px 0 0">Se carga en <b>${esc(fechaLarga(f))}</b>.</p></section>
+<section class="card sec"><h2>2. Sacale la foto a Claude</h2><p>Abrí la app de Claude, mandale la foto junto con las instrucciones y copiá la lista que te devuelva.</p>
+<button class="btn ghost" data-a="pg-copiar" style="width:100%">COPIAR INSTRUCCIONES PARA CLAUDE</button></section>
+<section class="card sec"><h2>3. Pegá la lista acá</h2>
+<textarea id="pg-txt" rows="8" placeholder="ACOSTA;12345,67&#10;ANDRADA;5000,00&#10;TOTAL;17345,67" style="width:100%;border-radius:12px;border:1px solid #C9D3D0;padding:10px;font:14px ui-monospace,Menlo,Consolas,monospace">${esc(P.texto || '')}</textarea>
+<div class="btns" style="margin-top:8px"><button class="btn ghost" data-a="pg-pegar">PEGAR DEL PORTAPAPELES</button></div></section></div>
+<div class="foot"><button class="btn green" data-a="pg-leer" style="flex:1${lk ? ';opacity:.4' : ''}"${lk ? ' disabled' : ''}>LEER LISTA</button></div>` + nav();
+  }
+  function pgResumen(L_) {
+    const asig = L_.filas.filter((x) => x.id && x.estado !== 'omitir');
+    const total = L.r2(asig.reduce((s, x) => s + x.monto, 0));
+    const sin = L_.filas.filter((x) => !x.id && x.estado !== 'omitir').length;
+    const omit = L_.filas.filter((x) => x.estado === 'omitir').length;
+    return { total, sin, omit, n: asig.length };
+  }
+  function viewPegarRevisar() {
+    const P = S.pegar, Ls = P.lista, r = pgResumen(Ls), exp = P.totalEsperado != null ? P.totalEsperado : Ls.totalDeclarado;
+    const todo = L.r2(Ls.filas.reduce((s, x) => s + x.monto, 0));
+    const tot = exp == null ? '<span class="bdg warn">Sin total para comparar</span>' : (Math.abs(L.r2(todo - exp)) < 0.005 ? '<span class="bdg okb">Cuadra con el total</span>' : `<span class="bdg warn">No cuadra: difiere ${L.fmtAR(Math.abs(L.r2(todo - exp)))}</span>`);
+    const opts = (x) => '<option value="">— elegir cliente —</option><option value="__omitir"' + (x.estado === 'omitir' ? ' selected' : '') + '>NO CARGAR esta línea</option>' + DB.clients.map((c) => `<option value="${esc(c.id)}"${x.id === c.id && x.estado !== 'omitir' ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+    const filas = Ls.filas.map((x, i) => {
+      const cl = DB.clients.find((c) => c.id === x.id), t0 = x.id ? getT(Ls.fecha, x.id) : null, ya = t0 && t0[Ls.campo];
+      const cls_ = x.estado === 'omitir' ? 'pg om' : !x.id ? 'pg rojo' : x.estado === 'exacto' ? 'pg verde' : x.estado === 'manual' ? 'pg verde' : 'pg amar';
+      const nota = x.estado === 'omitir' ? 'No se carga' : !x.id ? 'Sin identificar: elegilo' : x.estado === 'parecido' ? 'Parece: ' + esc(cl.name) + ' — revisalo' : x.estado === 'manual' ? 'Elegido a mano: ' + esc(cl.name) : '';
+      return `<div class="card ${cls_}"><div class="pgh"><b>${esc(x.nombre)}</b><b>${L.fmtAR(x.monto)}</b></div>${nota ? `<small>${nota}</small>` : ''}${ya && x.id && Math.abs(ya - x.monto) > 0.004 ? `<small>Ya tenía ${L.fmtAR(ya)}: se reemplaza</small>` : ''}<select data-pgsel="${i}" aria-label="Cliente para ${esc(x.nombre)}">${opts(x)}</select></div>`;
+    }).join('');
+    return subHeader('Revisar lista') + `<div class="body">
+<section class="card res"><div class="rline big"><span>${esc(pgNombre(Ls.campo))} · ${esc(fechaCorta(Ls.fecha))}</span></div>
+<div class="rline"><span>Renglones leídos</span><b>${Ls.filas.length}</b></div>
+<div class="rline"><span>Se cargan</span><b>${r.n} · ${L.fmtAR(r.total)}</b></div>
+${r.sin ? `<div class="rline"><span>Sin identificar</span><span class="bdg warn">${r.sin}</span></div>` : ''}${r.omit ? `<div class="rline"><span>No se cargan</span><b>${r.omit}</b></div>` : ''}
+<div class="rline"><span>Total de la lista${Ls.totalDeclarado != null ? ' (TOTAL)' : ''}</span><b>${L.fmtAR(todo)}</b></div>
+<label class="f" style="margin-top:6px">Total de la planilla (opcional, para comparar)<input id="pg-exp" type="text" inputmode="decimal" placeholder="0,00" value="${exp != null ? L.fmtAR(exp) : ''}"></label>
+<div class="rline"><span>Control</span>${tot}</div></section>
+${Ls.ignoradas.length ? `<div class="banner"><b>${Ls.ignoradas.length} renglón(es) no se pudieron leer:</b><br>${Ls.ignoradas.map(esc).join('<br>')}</div>` : ''}
+${filas || '<div class="empty">No se encontró ningún renglón con un monto.</div>'}</div>
+<div class="foot"><button class="btn ghost" data-a="pg-atras" style="flex:1">ATRÁS</button><button class="btn green" data-a="pg-aplicar" style="flex:1.4${r.sin || !r.n ? ';opacity:.4' : ''}"${r.sin || !r.n ? ' disabled' : ''}>CARGAR EN ${esc(pgNombre(Ls.campo).toUpperCase())}</button></div>` + nav();
+  }
+  function pgLeer() {
+    const e = document.getElementById('pg-txt'); const txt = e ? e.value : S.pegar.texto;
+    S.pegar.texto = txt;
+    if (diaBloqueado(S.fecha)) return toast('El día está guardado. Destrabalo primero.', 3500);
+    const lista = L.armarLista(DB, txt, S.pegar.campo, S.fecha);
+    if (!lista.filas.length) return toast('No encontré renglones con un monto. Revisá el texto pegado.', 4000);
+    S.pegar.lista = lista; S.pegar.totalEsperado = null; S.pegar.paso = 'revisar'; render();
+  }
+  function pgAplicar() {
+    const Ls = S.pegar.lista, r = pgResumen(Ls);
+    if (r.sin) return toast('Faltan clientes por identificar.', 3000);
+    if (diaBloqueado(Ls.fecha)) return toast('El día está guardado. Destrabalo primero.', 3500);
+    S.modal = { title: '¿Cargar la lista?', ok: 'OK, CARGAR', cancel: 'ATRÁS',
+      text: `Se cargan <b>${r.n} clientes</b> en <b>${esc(pgNombre(Ls.campo))}</b> del ${esc(fechaLarga(Ls.fecha))}: total <b>${L.fmtAR(r.total)}</b>.<br><br>Después tocá GUARDAR DÍA en Cierre.`,
+      onOk: () => { const c = L.aplicarLista(DB, Ls, setVal); S.pegar = null; toast('Listo: ' + c.clientes + ' clientes cargados. Recordá GUARDAR DÍA.', 4500); } };
+    render();
+  }
+
+  function viewStub(titulo, texto) {
+    return header(titulo, false) + `<div class="stub"><b>${titulo}</b><span>${texto}</span></div>` + nav();
+  }
+
+  const LOCK = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#B7791F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="pide PIN de titular"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
+  const fechaLarga = (f) => { const t = dateObj(f).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const fechaCorta = (f) => f.slice(8, 10) + '/' + f.slice(5, 7);
+  const subHeader = (t, extra) => `<header class="hdr"><div class="row"><button class="chip" data-a="subback" aria-label="Volver">‹ Volver</button><h1 style="font-size:20px">${t}</h1>${extra || '<span style="width:76px"></span>'}</div></header>`;
+
+  function viewMasRouter() {
+    switch (S.sub) {
+      case 'historial': return viewHistorial();
+      case 'clientes': return viewClientes();
+      case 'cform': return viewCForm();
+      case 'notas': return viewNotas();
+      case 'respaldo': return viewRespaldo();
+      case 'archivar': return viewArchivar();
+      case 'pasar': return viewPasar();
+      case 'retiros': return viewRetiros();
+      case 'resumen': return viewResumen();
+      default: return viewMas();
+    }
+  }
+
+  function viewMas() {
+    const dias = Object.keys(DB.allTxns).length;
+    const sab = new Date().getDay() === 6;
+    const row = (v, t, sub, lock) => `<button class="mrow" data-a="menu" data-v="${v}"><span><b>${t}</b><small>${sub}</small></span>${lock ? LOCK : '<span aria-hidden="true">›</span>'}</button>`;
+    return header('Más', false) + `<div class="body">
+${sab ? '<div class="banner"><b>Es sábado:</b> hacé el respaldo y guardalo en tu Drive.</div>' : ''}
+${row('limpiar', 'Limpiar (Cierre diario)', 'Borra compras y pagos de ' + esc(fechaLarga(S.fecha)), true)}
+${DB.undo ? `<button class="mrow" data-a="menu" data-v="undo" style="border-color:#E8B65A;background:#FFF8E8"><span><b>Deshacer la última limpieza</b><small>Día ${esc(fechaLarga(DB.undo.fecha))}</small></span><span aria-hidden="true">↶</span></button>` : ''}
+${row('resumen', 'Resumen del día', 'Cierre, arqueo y logística en un texto para compartir', false)}
+${row('retiros', 'Retiros del mes', 'Retiro NF y ajustes de ROKE y NICOLAS', true)}
+${row('historial', 'Historial', 'Movimientos y saldo de cada cliente', false)}
+${row('clientes', 'Clientes', 'Altas, bajas, mail, teléfono y saldo inicial', true)}
+${row('notas', 'Bitácora', 'Notas del día', false)}
+${row('pasar', 'Pasar datos entre celulares', 'Enviar cierre, sumar cierre y saldos', false)}
+${row('respaldo', 'Respaldo', 'Hacer o restaurar el archivo de respaldo', true)}
+${row('archivar', 'Limpiar historial viejo', 'Si la app se pone lenta: borra días anteriores y deja los saldos', true)}
+<div class="empty" style="padding:14px 6px;font-size:13px">${DB.clients.length} clientes · ${dias} días guardados en este celular · versión ${VERSION}</div></div>` + nav();
+  }
+
+  function viewRespaldo() {
+    return subHeader('Respaldo') + `<div class="body"><section class="card sec"><h2>Respaldo</h2><p>Hacé un respaldo seguido. Es un archivo que queda en Descargas y se puede mandar por WhatsApp.</p>
+<label class="chk"><input type="checkbox" data-opt="rJ" ${S.rJ ? 'checked' : ''}><span><b>Archivo de respaldo (.json)</b><small>Sirve para restaurar la app</small></span></label>
+<label class="chk"><input type="checkbox" data-opt="rX" ${S.rX ? 'checked' : ''}><span><b>Planilla de Excel (.xlsx)</b><small>Saldos, movimientos, arqueo y logística para mirar o imprimir</small></span></label>
+<div class="btns"><button class="btn" data-a="respaldo">Hacer respaldo</button><button class="btn red" data-a="restaurar">Restaurar</button></div>
+<input id="file" type="file" accept=".json,application/json" hidden></section></div>` + nav();
+  }
+
+  // ---- Historial ----
+  function histRows(id) {
+    const c = DB.clients.find((x) => x.id === id); let s = Number(c.saldoInicial) || 0; const out = [];
+    for (const d of Object.keys(DB.allTxns).sort()) {
+      const t = DB.allTxns[d][id]; if (!t) continue;
+      s = L.r2(s + L.mov(t));
+      out.push({ d, compra: t.compra || 0, pago: L.r2((t.efectivo1 || 0) + (t.efectivo2 || 0) + (t.mercadopago || 0) + (t.transferencia || 0)), aj: t.ajuste || 0, saldo: s });
+    }
+    return out.reverse();
+  }
+  function histListHTML() {
+    const q = norm(S.hq.trim());
+    const rows = DB.clients.filter((c) => !q || norm(c.name).includes(q)).map((c) => {
+      const sa = L.saldoHasta(DB, c.id, '9999-12-31', true);
+      return `<div class="card"><button class="crow" data-a="hsel" data-v="${c.id}"><span class="n">${esc(c.name)}${c.active === false ? ' <small>(inactivo)</small>' : ''}</span><span class="sal ${cls(sa)}">${L.fmtAR(sa)}</span></button></div>`;
+    });
+    return rows.join('') || '<div class="empty">No hay clientes con ese nombre.</div>';
+  }
+  function viewHistorial() {
+    if (!S.selCli) return subHeader('Historial') + `<div class="search"><input id="hq" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.hq)}"></div><div class="body" id="list2">${histListHTML()}</div>` + nav();
+    const c = DB.clients.find((x) => x.id === S.selCli); if (!c) { S.selCli = null; return viewHistorial(); }
+    const sa = L.saldoHasta(DB, c.id, '9999-12-31', true);
+    const rows = histRows(c.id).map((r) => `<div class="hrow"><span><b>${fechaCorta(r.d)}</b>${r.aj ? `<small>Ajuste ${L.fmtAR(r.aj)}</small>` : ''}</span><span>${L.fmtAR(r.compra)}</span><span class="neg">${L.fmtAR(r.pago)}</span><b class="${cls(r.saldo)}">${L.fmtAR(r.saldo)}</b></div>`).join('');
+    return subHeader(esc(c.name)) + `<div class="body"><div class="card" style="display:flex;justify-content:space-between"><span>Saldo actual</span><b class="sal ${cls(sa)}">${L.fmtAR(sa)}</b></div>
+<div class="card" style="padding:0;overflow:hidden"><div class="hrow hh"><span>Día</span><span>Compra</span><span>Pagó</span><span>Saldo</span></div>${rows || '<div class="empty">Sin movimientos todavía.</div>'}<div class="hrow"><span><b>${c.saldoDesde ? 'Antes del ' + fechaCorta(c.saldoDesde) : 'Inicio'}</b></span><span></span><span></span><b>${L.fmtAR(c.saldoInicial)}</b></div></div></div>` + nav();
+  }
+
+  // ---- Clientes ----
+  function cliListHTML() {
+    const q = norm(S.hq.trim());
+    const rows = DB.clients.filter((c) => (S.verInact || c.active !== false) && (!q || norm(c.name).includes(q))).map((c) => {
+      const sub = [c.email, c.telefono].filter(Boolean).join(' · ') || 'Sin mail ni teléfono';
+      return `<div class="card" ${c.active === false ? 'style="opacity:.65"' : ''}><button class="crow" data-a="cedit" data-v="${c.id}"><span><span class="n">${esc(c.name)}${c.active === false ? ' (inactivo)' : ''}</span><span class="s">${esc(sub)}</span></span><span class="sal zero">Saldo inicial<br>${L.fmtAR(c.saldoInicial)}</span></button></div>`;
+    });
+    return rows.join('') || '<div class="empty">No hay clientes con ese filtro.</div>';
+  }
+  function viewClientes() {
+    return subHeader('Clientes', '<button class="chip" data-a="cnew" style="background:#F2B544;color:#2A1B00;font-weight:800">+ Nuevo</button>') +
+      `<div class="search"><input id="hq" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.hq)}"><button class="btn sm ${S.verInact ? 'on' : 'ghost'}" data-a="cinact" aria-pressed="${S.verInact}">Ver inactivos</button></div><div class="body" id="list2">${cliListHTML()}</div>` + nav();
+  }
+  function viewCForm() {
+    const nuevo = S.edit === 'nuevo';
+    const c = nuevo ? { name: '', saldoInicial: 0, email: '', telefono: '', active: true } : DB.clients.find((x) => x.id === S.edit);
+    if (!c) { S.sub = 'clientes'; return viewClientes(); }
+    return subHeader(nuevo ? 'Cliente nuevo' : 'Editar cliente') + `<div class="body">
+<section class="card" style="display:flex;flex-direction:column;gap:12px">
+<label class="f">Nombre<input id="c-name" type="text" style="text-align:left" value="${esc(c.name)}" autocomplete="off"></label>
+<label class="f">Saldo inicial<input id="c-saldo" type="text" inputmode="decimal" value="${c.saldoInicial ? L.fmtAR(c.saldoInicial) : ''}" placeholder="0,00"></label>
+<p style="margin:0;font-size:12px;color:#55625F;line-height:1.35">Es el saldo con el que arrancó la cuenta. Si lo cambiás, cambia el saldo actual del cliente.</p>
+<label class="f">Mail<input id="c-mail" type="email" inputmode="email" style="text-align:left" value="${esc(c.email)}" autocomplete="off"></label>
+<label class="f">Teléfono<input id="c-tel" type="tel" style="text-align:left" value="${esc(c.telefono)}" autocomplete="off"></label>
+<button class="btn green" data-a="csave">GUARDAR CLIENTE</button>
+${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data-a="ctoggle">${c.active === false ? 'Volver a activar' : 'Desactivar cliente'}</button>`}
+</section>${nuevo ? '' : '<p style="margin:0;font-size:12px;color:#55625F;line-height:1.4">Un cliente desactivado deja de aparecer en el Cierre, pero su historial queda guardado.</p>'}</div>` + nav();
+  }
+
+  // ---- Bitácora ----
+  function viewNotas() {
+    const lista = DB.notas.slice().reverse().map((n) => `<article class="card"><div style="display:flex;justify-content:space-between;font-size:12px;color:#55625F"><b style="color:#0F4C4F">${esc(fechaLarga(n.fecha))}</b><span>${esc(n.usuario)}</span></div><p style="margin:6px 0 0;font-size:16px;line-height:1.4;white-space:pre-wrap">${esc(n.texto)}</p></article>`).join('');
+    return subHeader('Bitácora') + `<div class="body">${lista || '<div class="empty">Todavía no hay notas.</div>'}</div>
+<div class="foot" style="align-items:flex-end"><label class="f" style="flex:1">Nueva nota<input id="n-text" type="text" style="text-align:left" placeholder="Escribí acá…" autocomplete="off"></label><button class="btn green" data-a="nsave">GUARDAR</button></div>` + nav();
+  }
+
+  function modalHTML() {
+    if (!S.modal) return '';
+    const m = S.modal;
+    const pins = m.pin ? `<input id="mpin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="PIN" placeholder="PIN de 4 números" style="height:52px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:22px;letter-spacing:6px;text-align:center">${m.pin === 2 ? '<input id="mpin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Repetir PIN" placeholder="Repetilo" style="height:52px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:22px;letter-spacing:6px;text-align:center">' : ''}<div id="merr" role="alert" style="color:#B3261E;font-weight:700;min-height:18px;font-size:14px"></div>` : '';
+    return `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(m.title)}"><div class="box"><h3>${esc(m.title)}</h3><p>${m.text}</p>${pins}<div class="btns"><button class="btn ghost" data-a="m-no">${esc(m.cancel || 'ATRÁS')}</button><button class="btn ${m.danger ? 'red' : 'green'}" data-a="m-ok">${esc(m.ok)}</button></div></div></div>`;
+  }
+
+  function render() {
+    let h;
+    if (!S.logged) h = viewLogin();
+    else if (S.tab === 'cierre') h = S.pegar ? viewPegar() : viewCierre();
+    else if (S.tab === 'arqueo') h = viewArqueo();
+    else if (S.tab === 'logistica') h = viewLogistica();
+    else h = viewMasRouter();
+    app.innerHTML = h + modalHTML();
+    showToast();
+    const mp = document.getElementById('mpin'); if (mp) mp.focus();
+  }
+
+  function refreshList() { const l = document.getElementById('list'); if (l) l.innerHTML = listHTML(); }
+  function refreshFoot() { const f = document.getElementById('foot'); if (f) f.innerHTML = footHTML(); }
+
+  // ---------- PIN ----------
+  async function pinDone() {
+    const name = S.name.trim();
+    if (S.stage === 'crear') { S.first = S.buf; S.buf = ''; S.stage = 'confirmar'; S.msg = ''; return render(); }
+    if (S.stage === 'confirmar') {
+      if (S.buf !== S.first) { S.buf = ''; S.first = ''; S.stage = 'crear'; S.msg = 'No coinciden. Elegí el PIN de nuevo.'; return render(); }
+      if (!name) { S.buf = ''; S.first = ''; S.stage = 'crear'; S.msg = 'Escribí tu nombre o iniciales y empezá de nuevo.'; return render(); }
+      DB.config.pinHash = await hashPin(S.buf);
+      persist(); S.logged = true; S.buf = ''; S.first = ''; S.msg = ''; S.stage = 'entrar'; return render();
+    }
+    if (!name) { S.buf = ''; S.msg = 'Escribí tu nombre o iniciales.'; return render(); }
+    const ok = (await hashPin(S.buf)) === DB.config.pinHash;
+    S.buf = '';
+    if (!ok) { S.msg = 'PIN incorrecto.'; return render(); }
+    S.logged = true; S.msg = ''; render();
+  }
+
+  // ---------- Respaldo ----------
+  function bajar(nombre, blob) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  // Para mandar por WhatsApp/mail si el celular deja; si no, se baja a Descargas.
+  async function entregar(nombre, blob, aviso) {
+    try {
+      const f = new File([blob], nombre, { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: nombre }); return toast('Listo, enviado.', 3000); }
+    } catch (e) { if (e && e.name === 'AbortError') return toast('Se canceló el envío.', 3000); }
+    bajar(nombre, blob); toast(aviso || 'Archivo guardado en Descargas.', 4500);
+  }
+  const datosCompletos = () => ({ exportedAt: new Date().toISOString(), clients: DB.clients, allTxns: DB.allTxns, arqueo: DB.arqueo, logisticaTxns: DB.logisticaTxns, baseSemana: DB.baseSemana, notas: DB.notas });
+  function hacerRespaldo() {
+    if (!S.rJ && !S.rX) return toast('Elegí al menos un archivo.', 3000);
+    let demora = 0;
+    if (S.rJ) { bajar('respaldo-cuenta-corriente-' + today() + '.json', new Blob([JSON.stringify(datosCompletos(), null, 2)], { type: 'application/json' })); demora = 700; }
+    if (S.rX) setTimeout(() => bajar('planilla-cuenta-corriente-' + today() + '.xlsx', new Blob([root.R284X.makeXlsx(L.filasExcel(DB))], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })), demora);
+    toast('Respaldo hecho. Buscalo en Descargas.', 3500);
+  }
+
+  function leerArchivo(file) {
+    const r = new FileReader();
+    r.onerror = () => toast('No se pudo leer el archivo. No se cambió nada.', 4000);
+    r.onload = () => {
+      let o;
+      try { o = JSON.parse(r.result); } catch (e) { return toast('Ese archivo no es un respaldo válido. No se cambió nada.', 4500); }
+      if (!o || !Array.isArray(o.clients) || typeof o.allTxns !== 'object' || !o.allTxns) return toast('Ese archivo no parece un respaldo. No se cambió nada.', 4500);
+      const dias = Object.keys(o.allTxns).length;
+      const sin = L.cargasSinEnviar(DB, o);
+      const aviso = sin ? `<br><br><b style="color:#B3261E">Ojo: este celular tiene ${sin} cargas que NO están en el archivo y se perderían.</b>` : '';
+      S.modal = {
+        title: '¿Restaurar este respaldo?', ok: 'RESTAURAR', danger: true,
+        text: `Trae <b>${o.clients.length} clientes</b> y <b>${dias} días</b>${o.exportedAt ? ' (hecho el ' + esc(o.exportedAt.slice(0, 10)) + ')' : ''}.<br><br><b>Reemplaza todo lo que hay ahora en este celular.</b>${aviso}`,
+        onOk: () => {
+          DB = Object.assign(blank(), { clients: o.clients, allTxns: o.allTxns, arqueo: o.arqueo || {}, logisticaTxns: o.logisticaTxns || {}, baseSemana: o.baseSemana || blank().baseSemana, notas: o.notas || [], config: DB.config });
+          if (persist()) toast('Respaldo efectuado', 3000);
+        }
+      };
+      render();
+    };
+    r.readAsText(file);
+  }
+
+  // ---------- Arqueo ----------
+  const fv = (n) => (n ? L.fmtAR(n) : '');
+  const inp = (id, lab, val, attr, extra) => `<label class="f">${lab}<input type="text" inputmode="decimal" id="${id}" ${attr} placeholder="0,00" value="${val}" ${extra || ''} class="${val ? 'has' : ''}"></label>`;
+  function difBadge(n, pos, neg) {
+    if (Math.abs(n) < 0.005) return '<span class="bdg okb">Cierra</span>';
+    return `<span class="bdg warn">${n > 0 ? pos : neg} ${L.fmtAR(Math.abs(n))}</span>`;
+  }
+  function resLine(label, id, n, pos, neg, big) {
+    return `<div class="rline${big ? ' big' : ''}"><span>${label}</span><span id="${id}">${difBadge(n, pos, neg)}</span></div>`;
+  }
+  function arVals() {
+    const g = (id) => { const e = document.getElementById(id); const n = e ? L.parseAR(e.value) : 0; return isNaN(n) ? 0 : n; };
+    return { depositadoGeneral: g('ar-gen'), depositado1: g('ar-d1'), depositado2: g('ar-d2'), retiroNF: g('ar-nf') };
+  }
+  function arCalc() {
+    const rec = arVals(), x = L.arqueoDia(DB, S.fecha, rec), p = L.arqueoAcum(DB, S.fecha, false);
+    const set = (id, h) => { const e = document.getElementById(id); if (e) e.innerHTML = h; };
+    set('ar-rdg', difBadge(x.dg, 'Faltan', 'Sobran')); set('ar-rag', difBadge(L.r2(p.g + x.dg), 'Faltan', 'Sobran'));
+    set('ar-rd1', difBadge(x.d1, 'Faltan', 'Sobran')); set('ar-ra1', difBadge(L.r2(p.c1 + x.d1), 'Faltan', 'Sobran'));
+    set('ar-rd2', difBadge(x.d2, 'Faltan', 'Sobran')); set('ar-ra2', difBadge(L.r2(p.c2 + x.d2), 'Faltan', 'Sobran'));
+  }
+  function detalleArqueoHTML() {
+    const r = L.detalleArqueo(DB);
+    if (!r.length) return '<p>Todavía no hay arqueos guardados.</p>';
+    return '<table class="dtab"><tr><th>Día</th><th>Cobrado</th><th>Deposit.</th><th>Dif.</th><th>Acum.</th></tr>' + r.map((x) =>
+      `<tr><td>${esc(x.fecha.slice(8, 10) + '/' + x.fecha.slice(5, 7))}</td><td>${L.fmtAR(x.cobrado)}</td><td>${L.fmtAR(x.depositado)}</td><td>${L.fmtAR(x.dif)}</td><td><b>${L.fmtAR(x.acum)}</b></td></tr>`).join('') + '</table><p style="margin:8px 0 0">Cobrado = efectivo COB 1 + COB 2. Deposit. = general + retiro NF. Para encontrar una diferencia, compará esta lista con la de tu app anterior.</p>';
+  }
+  function viewArqueo() {
+    const f = S.fecha, rec = DB.arqueo[f] || {}, t = L.totalesDia(DB, f);
+    const x = L.arqueoDia(DB, f), p = L.arqueoAcum(DB, f, false);
+    const line = (l, v) => `<div class="rline"><span>${l}</span><b>${L.fmtAR(v)}</b></div>`;
+    const R = (l, id, n, big) => `<div class="rline${big ? ' big' : ''}"><span>${l}</span><span id="${id}">${difBadge(n, 'Faltan', 'Sobran')}</span></div>`;
+    const lk = recBloq(DB.arqueo[f]);
+    const html = header('Arqueo', true) + `<div class="body">${lk ? bannerBloq(DB.arqueo[f], 'adestr') : ''}
+<section class="card sec"><h2>Cobrador 1</h2>${line('Cobrado', t.efectivo1)}
+${inp('ar-d1', 'Depositado', fv(rec.depositado1), 'data-arq="1"')}
+${R('Diferencia', 'ar-rd1', x.d1)}${R('Acumulado', 'ar-ra1', L.r2(p.c1 + x.d1))}</section>
+<section class="card sec"><h2>Cobrador 2</h2>${line('Cobrado', t.efectivo2)}
+${inp('ar-d2', 'Depositado', fv(rec.depositado2), 'data-arq="1"')}
+${R('Diferencia', 'ar-rd2', x.d2)}${R('Acumulado', 'ar-ra2', L.r2(p.c2 + x.d2))}</section>
+<section class="card sec"><h2>Retiro y depósito general</h2><div class="grid2">
+${inp('ar-nf', 'Retiro no facturado', fv(rec.retiroNF), 'data-arq="1"')}${inp('ar-gen', 'Depositado general', fv(rec.depositadoGeneral), 'data-arq="gen"', rec.depositadoGeneral != null && DB.arqueo[f] ? 'data-touched="1"' : '')}
+</div><p style="margin:10px 0 0">El general se completa solo (COB 1 + COB 2 − retiro). Si el banco te dio otro número, escribilo.</p></section>
+<section class="card res">${R('Total diferencia del día', 'ar-rdg', x.dg, true)}${R('Total acumulado', 'ar-rag', L.r2(p.g + x.dg), true)}
+<p style="margin:8px 0 0;font-size:12px;color:#55625F">"Faltan" = se cobró más de lo que se depositó. "Sobran" = se depositó de más.</p></section>
+<details class="card sec det"><summary>Ver el acumulado día por día</summary>${detalleArqueoHTML()}</details></div>
+<div class="foot">${lk ? '<button class="btn ghost" data-a="adestr" style="flex:1">🔒 DESTRABAR ARQUEO</button>' : '<button class="btn green" data-a="asave" style="flex:1">GUARDAR ARQUEO</button>'}</div>` + nav();
+    return lk ? html.replace(/ data-arq=/g, ' disabled data-arq=') : html;
+  }
+  // Cuando están guardados los 3 pasos del día (Cierre, Arqueo y Logística) se ofrece el respaldo.
+  function preguntarRespaldo() {
+    const f = S.fecha;
+    if (!diaBloqueado(f) || !recBloq(DB.arqueo[f]) || !recBloq(DB.logisticaTxns[f])) return;
+    S.modal = { title: 'Día completo guardado', ok: 'HACER RESPALDO', cancel: 'MÁS TARDE',
+      text: `Ya guardaste Cierre, Arqueo y Logística del <b>${esc(fechaLarga(f))}</b>.<br><br>¿Hacés el respaldo ahora?`, onOk: hacerRespaldo };
+    render();
+  }
+  function guardarArqueo() {
+    const ids = ['ar-d1', 'ar-d2', 'ar-nf', 'ar-gen'];
+    if (ids.some((i) => isNaN(L.parseAR(document.getElementById(i).value)))) return toast('Hay un número que no es válido.', 3000);
+    const v = arVals();
+    DB.arqueo[S.fecha] = Object.assign(v, { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true });
+    if (persist()) { toast('Arqueo guardado y bloqueado'); render(); preguntarRespaldo(); }
+  }
+
+  // ---------- Logística ----------
+  function lgVals() {
+    const g = (id) => { const e = document.getElementById(id); const n = e ? L.parseAR(e.value) : 0; return isNaN(n) ? 0 : n; };
+    return { efectivoAyer: g('lg-ef'), mercadopagoAyer: g('lg-mp'), transferenciaAyer: g('lg-tr'), pagosAfectado: g('lg-pa'), correccion: g('lg-co') };
+  }
+  function lgCalc() {
+    const d = L.difLog(lgVals()), a = L.logAcum(DB, S.fecha, false);
+    const set = (id, h) => { const e = document.getElementById(id); if (e) e.innerHTML = h; };
+    set('lg-rd', difBadge(d, 'Falta acreditar', 'Acreditó de más')); set('lg-ra', difBadge(L.r2(a + d), 'Falta acreditar', 'Acreditó de más'));
+  }
+  function viewLogistica() {
+    const f = S.fecha, saved = DB.logisticaTxns[f], sug = L.sugLogistica(DB, f), rec = saved || { efectivoAyer: sug.efectivoAyer, mercadopagoAyer: sug.mercadopagoAyer, transferenciaAyer: sug.transferenciaAyer };
+    const d = L.difLog(rec), a = L.logAcum(DB, f, false);
+    const fAnt = sug.fechaCobro || L.diaAnterior(f);
+    const lk = recBloq(saved);
+    const html = header('Logística', true) + `<div class="body">${lk ? bannerBloq(saved, 'ldestr') : ''}
+<section class="card sec"><h2>RENDICIÓN ${esc(fechaCorta(fAnt))}</h2><div class="grid2">
+${inp('lg-ef', 'Efectivo depositado', fv(rec.efectivoAyer), 'data-lg="1"')}${inp('lg-mp', 'MercadoPago', fv(rec.mercadopagoAyer), 'data-lg="1"')}
+${inp('lg-tr', 'Transferencia', fv(rec.transferenciaAyer), 'data-lg="1"')}</div></section>
+<section class="card sec"><h2>ACREDITACIÓN LLSSA</h2><div class="grid2">
+${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${inp('lg-co', 'Corrección (+ / −)', fv(rec.correccion), 'data-lg="1"')}</div></section>
+<section class="card res"><div class="rline big"><span>Diferencia del día</span><span id="lg-rd">${difBadge(d, 'Falta acreditar', 'Acreditó de más')}</span></div>
+<div class="rline"><span>Diferencia acumulada</span><span id="lg-ra">${difBadge(L.r2(a + d), 'Falta acreditar', 'Acreditó de más')}</span></div></section></div>
+<div class="foot">${lk ? '<button class="btn ghost" data-a="ldestr" style="flex:1">🔒 DESTRABAR LOGÍSTICA</button>' : '<button class="btn green" data-a="lsave" style="flex:1">GUARDAR LOGÍSTICA</button>'}</div>` + nav();
+    return lk ? html.replace(/ data-lg=/g, ' disabled data-lg=') : html;
+  }
+  function guardarLogistica() {
+    const ids = ['lg-ef', 'lg-mp', 'lg-tr', 'lg-pa', 'lg-co'];
+    if (ids.some((i) => isNaN(L.parseAR(document.getElementById(i).value)))) return toast('Hay un número que no es válido.', 3000);
+    DB.logisticaTxns[S.fecha] = Object.assign(lgVals(), { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true });
+    if (persist()) { toast('Logística guardada y bloqueada'); render(); preguntarRespaldo(); }
+  }
+
+  // ---------- Resumen del día y Retiros ----------
+  async function compartirTexto(txt) {
+    try { if (navigator.share) { await navigator.share({ text: txt }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(txt); toast('Resumen copiado. Pegalo en WhatsApp.', 3500); } catch (e) { toast('No se pudo copiar. Usá Descargar.', 3500); }
+  }
+  function viewResumen() {
+    const f = S.rdia || S.fecha;
+    return subHeader('Resumen del día') + `<div class="body">
+<div class="datebar" style="background:#1B6468;margin:0"><button data-a="rdia" data-v="-1" aria-label="Día anterior">‹</button><span class="d">${esc(fechaLarga(f))}</span><button data-a="rdia" data-v="1" aria-label="Día siguiente">›</button></div>
+<pre class="resu">${esc(L.textoResumen(DB, f))}</pre>
+<div class="btns"><button class="btn green" data-a="r-comp">COMPARTIR</button><button class="btn ghost" data-a="r-desc">DESCARGAR</button></div></div>` + nav();
+  }
+  function viewRetiros() {
+    const ym = S.rmes || today().slice(0, 7), r = L.retirosMes(DB, ym), [y, m] = ym.split('-').map(Number);
+    const mes = new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    const filas = r.filas.map((x) => `<div class="card" style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><span><b>${esc(x.fecha.slice(8, 10) + '/' + x.fecha.slice(5, 7) + '/' + x.fecha.slice(0, 4))}</b><small style="display:block;color:#55625F">${x.nf ? 'Retiro NF ' + L.fmtAR(x.nf) : ''}${x.ajustes.map((j) => (x.nf ? ' · ' : '') + 'Ajuste ' + esc(j.nombre) + ' ' + L.fmtAR(j.monto)).join('')}</small></span><b>${L.fmtAR(x.total)}</b></div>`).join('');
+    return subHeader('Retiros') + `<div class="body">
+<div class="datebar" style="background:#1B6468;margin:0"><button data-a="rmes" data-v="-1" aria-label="Mes anterior">‹</button><span class="d">${esc(mes.charAt(0).toUpperCase() + mes.slice(1))}</span><button data-a="rmes" data-v="1" aria-label="Mes siguiente">›</button></div>
+<div class="card res" style="padding:16px"><div style="font-size:13px;color:#55625F">TOTAL RETIRADO EN EL MES</div><div style="font-size:30px;font-weight:800;margin:4px 0">$${L.fmtAR(r.total)}</div><div style="font-size:12px;color:#55625F">Suma el retiro no facturado del Arqueo y los ajustes de ROKE y NICOLAS. Cada mes empieza de cero.</div></div>
+${filas || '<div class="empty">No hay retiros en este mes.</div>'}</div>` + nav();
+  }
+
+  // ---------- Pasar datos entre celulares ----------
+  function viewPasar() {
+    const un = Date.now() < S.titularUntil, c = L.armarCierre(DB, S.fecha, S.name), n = Object.keys(c.dia).length;
+    const nada = !n && !c.arqueo && !c.logistica;
+    return subHeader('Pasar datos') + `<div class="body">
+<section class="card zona zt"><div class="ztit">PARA EL TITULAR ${un ? '' : LOCK}</div>
+<h2>Sumar cierre</h2><p>Abrí el archivo que te mandó el cobrador. Se <b>suma</b> a tus datos: no se borra nada. Si ya tenías algo distinto en un cliente, queda lo tuyo.</p>
+${un ? '<label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-c" type="file" accept=".json,application/json" hidden></label>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}
+<h2 style="margin-top:16px">Enviar datos al día</h2><p>Genera un archivo con todos los datos al día (también sirve para mandar una corrección de días anteriores). Los cobradores lo reciben con <b>Recibir datos</b>.</p>
+${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</button>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}</section>
+<section class="card zona zc"><div class="ztit">PARA EL COBRADOR</div>
+<h2>Enviar cierre</h2><p>Manda lo que cargaste el <b>${esc(fechaLarga(S.fecha))}</b>: ${n} ${n === 1 ? 'cliente' : 'clientes'}${c.arqueo ? ', arqueo' : ''}${c.logistica ? ', logística' : ''}. Para cambiar el día, volvé a Cierre y elegí otra fecha.</p>
+<button class="btn green" data-a="p-enviar" ${nada ? 'disabled style="opacity:.4;width:100%"' : 'style="width:100%"'}>ENVIAR CIERRE</button>
+<h2 style="margin-top:16px">Recibir datos del titular</h2><p>Abrí el archivo que mandó el titular. Se actualizan los saldos y los días corregidos. Lo que ya cargaste hoy sin guardar no se pierde.</p>
+<label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-s" type="file" accept=".json,application/json" hidden></label></section></div>` + nav();
+  }
+  function enviarCierre() {
+    const c = L.armarCierre(DB, S.fecha, S.name);
+    const nom = 'cierre-' + S.fecha + '-' + (S.name || 'equipo').replace(/[^\wÁÉÍÓÚÑáéíóúñ-]/g, '') + '.json';
+    entregar(nom, new Blob([JSON.stringify(c, null, 2)], { type: 'application/json' }), 'Cierre guardado en Descargas. Mandalo por WhatsApp.');
+  }
+  function enviarSaldos() {
+    const d = Object.assign(datosCompletos(), { tipo: 'saldos-r284' });
+    entregar('saldos-actualizados-' + today() + '.json', new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }), 'Saldos guardados en Descargas. Mandalos por WhatsApp.');
+  }
+  function leerSaldos(file) {
+    const r = new FileReader();
+    r.onerror = () => toast('No se pudo leer el archivo. No se cambió nada.', 4000);
+    r.onload = () => {
+      let o; try { o = JSON.parse(r.result); } catch (e) { return toast('Ese archivo no es válido. No se cambió nada.', 4500); }
+      if (!o || !Array.isArray(o.clients) || !o.allTxns || typeof o.allTxns !== 'object') return toast('Ese archivo no parece de la app. No se cambió nada.', 4500);
+      const p = L.recibirDatos(DB, o, false);
+      S.modal = { title: '¿Recibir los datos del titular?', ok: 'RECIBIR', danger: false,
+        text: `Trae <b>${o.clients.length} clientes</b> y <b>${Object.keys(o.allTxns).length} días</b>. Reemplaza los saldos y los días guardados de este celular.<br><br>Se mantienen tus <b>${p.conservadas}</b> cargas de días sin guardar.${p.reemplazadas ? `<br><br><b style="color:#B3261E">${p.reemplazadas} cargas tuyas de días ya guardados quedan reemplazadas por las del titular.</b>` : ''}`,
+        onOk: () => { L.recibirDatos(DB, o, true); if (persist()) toast('Datos recibidos', 3500); } };
+      render();
+    };
+    r.readAsText(file);
+  }
+  function leerCierre(file) {
+    const r = new FileReader();
+    r.onerror = () => toast('No se pudo leer el archivo. No se cambió nada.', 4000);
+    r.onload = () => {
+      let c; try { c = JSON.parse(r.result); } catch (e) { return toast('Ese archivo no es válido. No se cambió nada.', 4500); }
+      if (!c || c.tipo !== 'cierre-r284' || !/^\d{4}-\d{2}-\d{2}$/.test(c.fecha || '') || typeof c.dia !== 'object') return toast('Ese archivo no es un cierre de la app. No se cambió nada.', 4500);
+      const p = L.sumarCierre(DB, c, false), lst = (t, a) => a.length ? `<br>${t}: <b>${a.slice(0, 6).map(esc).join(', ')}${a.length > 6 ? ' y ' + (a.length - 6) + ' más' : ''}</b>` : '';
+      const hay = p.agregados.length || p.completados.length || p.arqueo === 'agregado' || p.logistica === 'agregado' || p.arqueo === 'completado' || p.logistica === 'completado';
+      S.modal = { title: '¿Sumar este cierre?', ok: hay ? 'SUMAR' : 'ENTENDIDO', danger: false,
+        text: `Cierre del <b>${esc(fechaLarga(c.fecha))}</b> mandado por <b>${esc(c.de || '?')}</b>.<br><br>Se agregan <b>${p.agregados.length}</b> clientes${p.arqueo === 'agregado' ? ' + arqueo' : ''}${p.logistica === 'agregado' ? ' + logística' : ''}.${p.completados.length || p.arqueo === 'completado' || p.logistica === 'completado' ? `<br>Se completan datos que faltaban en <b>${p.completados.length}</b> clientes${p.arqueo === 'completado' ? ' + arqueo' : ''}${p.logistica === 'completado' ? ' + logística' : ''}.` : ''}<br>Ya estaban iguales: ${p.iguales.length}.${lst('Ya tenían otro dato (queda lo tuyo)', p.conflictos)}${p.arqueo === 'conflicto' ? '<br>El arqueo ya tenía otro dato (queda el tuyo).' : ''}${p.logistica === 'conflicto' ? '<br>La logística ya tenía otro dato (queda la tuya).' : ''}${lst('Clientes que no existen acá (no se suman)', p.desconocidos)}`,
+        onOk: () => { if (!hay) return; L.sumarCierre(DB, c, true); S.fecha = c.fecha; if (persist()) toast('Cierre sumado', 3500); } };
+      render();
+    };
+    r.readAsText(file);
+  }
+
+  // ---------- Limpiar historial viejo ----------
+  function viewArchivar() {
+    const corte = S.corte || shiftDay(today(), -90), r = L.resumenCorte(DB, corte);
+    const ult = Object.keys(DB.allTxns).sort().pop() || today();
+    const ok = r.borrar > 0 && corte <= ult;
+    const base = DB.baseSemana && DB.baseSemana.desde ? `<p>Ya hay una limpieza anterior: los datos arrancan desde el <b>${esc(fechaCorta(DB.baseSemana.desde))}</b>.</p>` : '';
+    return subHeader('Limpiar historial') + `<div class="body">
+<section class="card sec"><h2>Paso 1: elegí el día</h2><p>Se borra todo lo que sea <b>anterior</b> a este día. Ese día y los siguientes quedan.</p>
+<label class="f">Borrar lo anterior al<input type="date" id="arc-corte" value="${esc(corte)}" max="${esc(ult)}" style="text-align:left"></label>${base}</section>
+<section class="card sec"><h2>Qué va a pasar</h2>
+${ok ? `<p style="font-size:15px;color:#1B2B2A">Se borran <b>${r.borrar} ${r.borrar === 1 ? 'día' : 'días'}</b> (del ${esc(fechaCorta(r.desde))} al ${esc(fechaCorta(r.hasta))}). Quedan <b>${r.quedan} ${r.quedan === 1 ? 'día' : 'días'}</b>.</p>
+<p>Antes de borrar, la app guarda como punto de partida una foto de todo:</p>
+<div class="rline"><span>Saldo de cada cliente (Cierre e Historial)</span><b>${DB.clients.length}</b></div>
+<div class="rline"><span>Arqueo acumulado general</span><b>${L.fmtAR(r.arq.g)}</b></div>
+<div class="rline"><span>Arqueo COB 1 / COB 2</span><b>${L.fmtAR(r.arq.c1)} / ${L.fmtAR(r.arq.c2)}</b></div>
+<div class="rline"><span>Logística acumulada</span><b>${L.fmtAR(r.log)}</b></div>` : '<p>Con ese día no hay nada para borrar. Elegí un día más reciente.</p>'}</section>
+${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un archivo con <b>todo</b> lo que hay ahora. Queda en Descargas y sirve para consultar lo viejo.</p>
+<button class="btn ${S.arcOk ? 'ghost' : 'green'}" data-a="arc-resp" style="width:100%">${S.arcOk ? 'Respaldo hecho ✓ (hacer otro)' : 'HACER RESPALDO'}</button></section>
+<section class="card sec"><h2>Paso 3: limpiar</h2><button class="btn red" data-a="arc-ir" ${S.arcOk ? '' : 'disabled'} style="width:100%;${S.arcOk ? '' : 'opacity:.4'}">LIMPIAR HISTORIAL</button></section>` : ''}
+</div>` + nav();
+  }
+  function confirmArchivar() {
+    if (!S.arcOk) return toast('Primero hacé el respaldo.', 3000);
+    const corte = S.corte, r = L.resumenCorte(DB, corte);
+    S.modal = { title: '¿El archivo está en Descargas?', ok: 'SÍ, LIMPIAR', danger: true,
+      text: `Se borran <b>${r.borrar} días</b> anteriores al <b>${esc(fechaCorta(corte))}</b>. No se puede deshacer, salvo restaurando el archivo.<br><br>Confirmá que el respaldo está en Descargas.`,
+      onOk: () => { L.limpiarAntes(DB, corte); S.arcOk = false; S.sub = null; if (persist()) toast('Listo. Datos desde el ' + fechaCorta(corte), 4000); } };
+    render();
+  }
+
+  // ---------- PIN de titular, Limpiar, Deshacer ----------
+  function requirePin(next) {
+    if (Date.now() < S.titularUntil) return next();
+    const ok = () => { S.titularUntil = Date.now() + 5 * 60 * 1000; return null; };
+    if (!DB.config.titularHash) {
+      S.modal = { title: 'PIN de titular', text: 'Primera vez: elegí un PIN de 4 números solo para el titular. Protege Limpiar, Clientes y Respaldo.', ok: 'GUARDAR', pin: 2,
+        onPin: async (p) => { DB.config.titularHash = await hashPin('T' + p); persist(); return ok(); }, after: next };
+    } else {
+      S.modal = { title: 'PIN de titular', text: 'Escribí el PIN de titular.', ok: 'ENTRAR', pin: 1,
+        onPin: async (p) => ((await hashPin('T' + p)) !== DB.config.titularHash ? 'PIN incorrecto.' : ok()), after: next };
+    }
+    render();
+  }
+  const PAGOS = ['compra', 'efectivo1', 'efectivo2', 'mercadopago', 'transferencia'];
+  function confirmLimpiar() {
+    const day = DB.allTxns[S.fecha] || {};
+    const n = Object.keys(day).filter((k) => k !== '__meta__' && PAGOS.some((p) => day[k][p])).length;
+    if (!n) return toast('No hay compras ni pagos cargados en ese día.', 3000);
+    S.modal = { title: '¿Limpiar el día?', ok: 'LIMPIAR', danger: true,
+      text: `Se borran las compras y pagos de <b>${n} clientes</b> del <b>${esc(fechaLarga(S.fecha))}</b>. Los ajustes no se tocan.<br><br>Antes se guarda una copia, por si querés deshacer.`,
+      onOk: () => {
+        const dd = DB.allTxns[S.fecha];
+        DB.undo = { fecha: S.fecha, day: JSON.parse(JSON.stringify(dd)), at: new Date().toISOString(), por: S.name };
+        for (const id of Object.keys(dd)) {
+          if (id === '__meta__') continue;
+          PAGOS.forEach((p) => { dd[id][p] = 0; });
+          if (L.KEYS.every((k) => !dd[id][k])) delete dd[id];
+        }
+        dd.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: false };
+        if (persist()) toast('Día limpiado. Podés deshacerlo desde Más.', 4000);
+      } };
+    render();
+  }
+  function confirmUndo() {
+    const u = DB.undo; if (!u) return;
+    S.modal = { title: '¿Deshacer la limpieza?', ok: 'DESHACER', text: `Vuelve a cargar lo que había el <b>${esc(fechaLarga(u.fecha))}</b>. Lo que hayas cargado después en ese día se reemplaza.`,
+      onOk: () => { DB.allTxns[u.fecha] = u.day; delete DB.undo; S.fecha = u.fecha; if (persist()) toast('Listo, se recuperó la carga.', 3000); } };
+    render();
+  }
+  async function okModal() {
+    const m = S.modal; if (!m) return;
+    if (m.pin) {
+      const p1 = document.getElementById('mpin').value;
+      const p2 = m.pin === 2 ? document.getElementById('mpin2').value : null;
+      let err = null;
+      if (!/^\d{4}$/.test(p1)) err = 'Escribí 4 números.';
+      else if (m.pin === 2 && p1 !== p2) err = 'Los dos PIN tienen que ser iguales.';
+      else err = await m.onPin(p1);
+      if (err) { const e = document.getElementById('merr'); if (e) e.textContent = err; return; }
+      S.modal = null; render(); if (m.after) m.after();
+      return;
+    }
+    S.modal = null; if (m.onOk) m.onOk(); render();
+  }
+
+  function guardarCliente() {
+    const name = document.getElementById('c-name').value.trim();
+    const saldo = L.parseAR(document.getElementById('c-saldo').value);
+    const mail = document.getElementById('c-mail').value.trim();
+    const tel = document.getElementById('c-tel').value.trim();
+    if (!name) return toast('Falta el nombre.');
+    if (isNaN(saldo)) return toast('El saldo inicial no es un número válido.', 3000);
+    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return toast('El mail no parece válido.', 3000);
+    const dup = DB.clients.find((c) => norm(c.name) === norm(name) && c.id !== S.edit);
+    if (dup) return toast('Ya hay un cliente con ese nombre.', 3000);
+    if (S.edit === 'nuevo') DB.clients.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, saldoInicial: saldo, email: mail, telefono: tel, active: true });
+    else { const c = DB.clients.find((x) => x.id === S.edit); Object.assign(c, { name, saldoInicial: saldo, email: mail, telefono: tel }); }
+    if (persist()) { toast('Cliente guardado'); S.sub = 'clientes'; S.edit = null; render(); }
+  }
+
+  // ---------- Eventos ----------
+  app.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-a]');
+    if (!b) return;
+    const a = b.dataset.a, v = b.dataset.v;
+    if (a === 'key') { if (S.buf.length < 4) { S.buf += v; S.msg = ''; render(); if (S.buf.length === 4) pinDone(); } }
+    else if (a === 'back') { S.buf = S.buf.slice(0, -1); render(); }
+    else if (a === 'lock') { S.logged = false; S.titularUntil = 0; S.buf = ''; S.stage = 'entrar'; S.msg = ''; render(); }
+    else if (a === 'tab') { S.tab = v; S.sub = null; S.pegar = null; S.selCli = null; render(); }
+    else if (a === 'dia') { S.fecha = shiftDay(S.fecha, Number(v)); S.open = null; render(); }
+    else if (a === 'destrabar') requirePin(confirmDestrabar);
+    else if (a === 'adestr') requirePin(() => confirmDestrabarRec('arqueo'));
+    else if (a === 'ldestr') requirePin(() => confirmDestrabarRec('logistica'));
+    else if (a === 'pg-abrir') { S.pegar = { paso: 'texto', campo: 'compra', texto: '' }; render(); }
+    else if (a === 'pg-campo') { const e = document.getElementById('pg-txt'); if (e) S.pegar.texto = e.value; S.pegar.campo = v; render(); }
+    else if (a === 'pg-copiar') {
+      const txt = pgInstrucciones(S.pegar.campo);
+      (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('Instrucciones copiadas. Pegalas en Claude junto con la foto.', 4000), () => toast('No se pudo copiar.', 3000));
+    }
+    else if (a === 'pg-pegar') {
+      (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject()).then((t) => { S.pegar.texto = t; render(); }, () => toast('No se pudo leer. Mantené apretado en el cuadro y elegí Pegar.', 4000));
+    }
+    else if (a === 'pg-leer') pgLeer();
+    else if (a === 'pg-atras') { S.pegar.paso = 'texto'; render(); }
+    else if (a === 'pg-aplicar') pgAplicar();
+    else if (a === 'solo') { S.solo = !S.solo; render(); }
+    else if (a === 'todos') { S.todos = !S.todos; try { localStorage.setItem('r284.todos', S.todos ? '1' : '0'); } catch (e) {} S.open = null; render(); }
+    else if (a === 'open') { S.open = v; refreshList(); const el = document.querySelector('.card.open'); if (el) el.scrollIntoView({ block: 'nearest' }); }
+    else if (a === 'close') { S.open = null; refreshList(); }
+    else if (a === 'guardar') {
+      const day = DB.allTxns[S.fecha];
+      if (!day || Object.keys(day).filter((k) => k !== '__meta__').length === 0) return toast('No hay nada cargado en este día.');
+      day.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: true };
+      S.open = null; if (persist()) { toast('Día guardado y bloqueado'); render(); preguntarRespaldo(); }
+    }
+    else if (a === 'respaldo') hacerRespaldo();
+    else if (a === 'restaurar') { const f = document.getElementById('file'); if (f) { f.value = ''; f.click(); } }
+    else if (a === 'm-no') { S.modal = null; render(); }
+    else if (a === 'm-ok') okModal();
+    else if (a === 'menu') {
+      if (v === 'limpiar') requirePin(confirmLimpiar);
+      else if (v === 'undo') confirmUndo();
+      else if (v === 'historial') { S.sub = 'historial'; S.selCli = null; S.hq = ''; render(); }
+      else if (v === 'clientes') requirePin(() => { S.sub = 'clientes'; S.hq = ''; render(); });
+      else if (v === 'notas') { S.sub = 'notas'; render(); }
+      else if (v === 'resumen') { S.sub = 'resumen'; S.rdia = S.fecha; render(); }
+      else if (v === 'retiros') requirePin(() => { S.sub = 'retiros'; S.rmes = today().slice(0, 7); render(); });
+      else if (v === 'pasar') { S.sub = 'pasar'; render(); }
+      else if (v === 'archivar') requirePin(() => { S.sub = 'archivar'; S.arcOk = false; S.corte = shiftDay(today(), -90); render(); });
+      else if (v === 'respaldo') requirePin(() => { S.sub = 'respaldo'; render(); });
+    }
+    else if (a === 'subback' && S.pegar) { if (S.pegar.paso === 'revisar') S.pegar.paso = 'texto'; else S.pegar = null; render(); }
+    else if (a === 'subback') { if (S.sub === 'cform') { S.sub = 'clientes'; S.edit = null; } else if (S.sub === 'historial' && S.selCli) S.selCli = null; else S.sub = null; render(); }
+    else if (a === 'hsel') { S.selCli = v; render(); }
+    else if (a === 'cnew') { S.edit = 'nuevo'; S.sub = 'cform'; render(); }
+    else if (a === 'cedit') { S.edit = v; S.sub = 'cform'; render(); }
+    else if (a === 'cinact') { S.verInact = !S.verInact; render(); }
+    else if (a === 'csave') guardarCliente();
+    else if (a === 'ctoggle') { const c = DB.clients.find((x) => x.id === S.edit); if (c) { c.active = c.active === false; if (persist()) { toast(c.active ? 'Cliente activado' : 'Cliente desactivado'); S.sub = 'clientes'; S.edit = null; render(); } } }
+    else if (a === 'rdia') { S.rdia = shiftDay(S.rdia || S.fecha, Number(v)); render(); }
+    else if (a === 'rmes') { const [y, m] = (S.rmes || today().slice(0, 7)).split('-').map(Number); const d = new Date(y, m - 1 + Number(v), 1); S.rmes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); render(); }
+    else if (a === 'r-desc') bajar('resumen-' + S.rdia + '.txt', new Blob([L.textoResumen(DB, S.rdia)], { type: 'text/plain' }));
+    else if (a === 'r-comp') compartirTexto(L.textoResumen(DB, S.rdia));
+    else if (a === 'p-pin') requirePin(() => render());
+    else if (a === 'p-enviar') enviarCierre();
+    else if (a === 'p-saldos') enviarSaldos();
+    else if (a === 'arc-resp') { hacerRespaldo(); S.arcOk = true; render(); }
+    else if (a === 'arc-ir') confirmArchivar();
+    else if (a === 'asave') guardarArqueo();
+    else if (a === 'lsave') guardarLogistica();
+    else if (a === 'nsave') { const el = document.getElementById('n-text'); const tx = el.value.trim(); if (!tx) return toast('Escribí la nota primero.'); DB.notas.push({ fecha: today(), texto: tx, usuario: S.name }); if (persist()) { toast('Nota guardada'); render(); } }
+  });
+
+  app.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.id === 'name') { S.name = t.value; localStorage.setItem(NAMEKEY, S.name); }
+    else if (t.id === 'q') { S.q = t.value; refreshList(); }
+    else if (t.dataset && t.dataset.arq) {
+      if (t.dataset.arq === 'gen') t.dataset.touched = '1';
+      else {
+        const gen = document.getElementById('ar-gen');
+        if (gen && !gen.dataset.touched) { const v = arVals(); const n = L.r2(v.depositado1 + v.depositado2 - v.retiroNF); gen.value = n ? L.fmtAR(n) : ''; }
+      }
+      arCalc();
+    }
+    else if (t.dataset && t.dataset.lg) lgCalc();
+    else if (t.id === 'hq') { S.hq = t.value; const l = document.getElementById('list2'); if (l) l.innerHTML = S.sub === 'clientes' ? cliListHTML() : histListHTML(); }
+  });
+
+  app.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.dataset && t.dataset.pgsel != null && S.pegar) {
+      const x = S.pegar.lista.filas[Number(t.dataset.pgsel)], val = t.value;
+      if (!val) { render(); return; }
+      if (val === '__omitir') { x.estado = 'omitir'; render(); return; }
+      const cl = DB.clients.find((c) => c.id === val);
+      S.modal = { title: 'Eligió a ' + cl.name, ok: 'OK', cancel: 'ATRÁS', text: `La línea <b>${esc(x.nombre)}</b> (${L.fmtAR(x.monto)}) se carga a <b>${esc(cl.name)}</b>.`,
+        onOk: () => { x.id = val; x.estado = 'manual'; } };
+      render(); return;
+    }
+    if (t.id === 'pg-exp' && S.pegar) { const n = L.parseAR(t.value); S.pegar.totalEsperado = isNaN(n) || t.value.trim() === '' ? null : n; render(); return; }
+    if (t.id === 'file' && t.files && t.files[0]) return leerArchivo(t.files[0]);
+    if (t.dataset && t.dataset.opt) { S[t.dataset.opt] = t.checked; return; }
+    if (t.id === 'file-c' && t.files && t.files[0]) return leerCierre(t.files[0]);
+    if (t.id === 'file-s' && t.files && t.files[0]) return leerSaldos(t.files[0]);
+    if (t.id === 'arc-corte') { if (/^\d{4}-\d{2}-\d{2}$/.test(t.value)) { S.corte = t.value; render(); } return; }
+    if (t.dataset && (t.dataset.arq || t.dataset.lg)) { const n = L.parseAR(t.value); if (isNaN(n)) { toast('Ese número no es válido.'); } else { t.value = n ? L.fmtAR(n) : ''; t.classList.toggle('has', !!n); } return; }
+    if (t.dataset && t.dataset.k) {
+      if (diaBloqueado(S.fecha)) return toast('El día está guardado. Destrabalo con el PIN de titular.', 3500);
+      const n = L.parseAR(t.value);
+      const t0 = getT(S.fecha, t.dataset.id);
+      if (isNaN(n)) { toast('Ese número no es válido.'); t.value = t0 && t0[t.dataset.k] ? L.fmtAR(t0[t.dataset.k]) : ''; return; }
+      setVal(S.fecha, t.dataset.id, t.dataset.k, n);
+      t.value = n ? L.fmtAR(n) : '';
+      t.classList.toggle('has', !!n);
+      const antes = L.saldoHasta(DB, t.dataset.id, S.fecha, false);
+      const nuevo = L.r2(antes + L.mov(getT(S.fecha, t.dataset.id)));
+      const el = document.getElementById('new-' + t.dataset.id);
+      if (el) { el.textContent = L.fmtAR(nuevo); el.className = 'b ' + cls(nuevo); }
+      const tt = dayTotals();
+      const setT = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = L.fmtAR(v); };
+      setT('tot-compras', tt.compras); setT('tot-efectivo', L.r2(tt.efectivo1 + tt.efectivo2)); setT('tot-mp', tt.mercadopago); setT('tot-transf', tt.transferencia);
+    }
+  });
+
+  // Si la app quedó abierta de un día para el otro, pasa sola al día de hoy.
+  hoyVisto = today();
+  function revisarDia() {
+    const h = today(); if (h === hoyVisto) return;
+    if (S.fecha === hoyVisto) S.fecha = h;
+    hoyVisto = h; S.open = null; if (!S.modal) render();
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) revisarDia(); });
+  window.addEventListener('focus', revisarDia);
+  setInterval(revisarDia, 30000);
+
+  render();
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+
+</script>
 </body>
 </html>
