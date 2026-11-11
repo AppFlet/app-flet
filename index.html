@@ -7,8 +7,7 @@
 <title>APP FLET</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
-<style>
-*{box-sizing:border-box}
+<style>*{box-sizing:border-box}
 html,body{margin:0;height:100%;background:#F1F4F3;color:#1B2B2A;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 button,input{font:inherit}
 #app{display:flex;flex-direction:column;height:100dvh;max-width:520px;margin:0 auto;background:#F1F4F3;position:relative}
@@ -94,13 +93,11 @@ button,input{font:inherit}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .pg{border-left:6px solid #C9D3D0}.pg.verde{border-left-color:#1E7A46}.pg.amar{border-left-color:#B7791F;background:#FFF8E8}.pg.rojo{border-left-color:#B3261E;background:#FDECEA}.pg.om{opacity:.6}
 .pg .pgh{display:flex;justify-content:space-between;gap:10px}.pg small{display:block;color:#55625F;margin:2px 0}.pg select{width:100%;height:44px;margin-top:6px;border-radius:10px;border:1px solid #C9D3D0;padding:0 8px;background:#fff;font-size:15px}
-
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script>
-'use strict';
+<script>'use strict';
 // Lógica de cuentas (sin pantalla). Se puede probar sola.
 (function (root) {
   const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -303,7 +300,7 @@ button,input{font:inherit}
         if (tieneDatos(t)) hist.push([d, nom(cid), ant, t.compra || 0, t.efectivo1 || 0, t.efectivo2 || 0, t.mercadopago || 0, t.transferencia || 0, t.ajuste || 0, corr[cid]]);
       }
     }
-    const arq = [['Fecha', 'Depositado general', 'Depósito cobrador 1', 'Depósito cobrador 2', 'Retiro NF']];
+    const arq = [['Fecha', 'Depositado general', 'Depósito cobrador 1', 'Depósito cobrador 2', 'Retiro']];
     for (const d of Object.keys(db.arqueo || {}).sort()) { const r = db.arqueo[d]; arq.push([d, r.depositadoGeneral || 0, r.depositado1 || 0, r.depositado2 || 0, r.retiroNF || 0]); }
     const log = [['Fecha', 'Efectivo (ayer)', 'MercadoPago (ayer)', 'Transferencia (ayer)', 'Total', 'Pagos afectado LLSSA', 'Diferencia', 'Corrección', 'Acumulado']];
     let ac = Number((db.baseSemana || {}).logistica) || 0;
@@ -361,7 +358,7 @@ button,input{font:inherit}
       'ARQUEO', 'Depositado: ' + mon(rec.depositadoGeneral || 0), 'Diferencia: ' + mon(a.dg),
       'Cobrador 1 — Recaudado: ' + mon(t.efectivo1), 'Cobrador 1 — Depositado: ' + mon(rec.depositado1 || 0), 'Cobrador 1 — Diferencia: ' + mon(a.d1),
       'Cobrador 2 — Recaudado: ' + mon(t.efectivo2), 'Cobrador 2 — Depositado: ' + mon(rec.depositado2 || 0), 'Cobrador 2 — Diferencia: ' + mon(a.d2),
-      'Retiro no facturado: ' + mon(rec.retiroNF || 0), 'Diferencia acumulada: ' + mon(ac.g), '',
+      'Retiro: ' + mon(rec.retiroNF || 0), 'Diferencia acumulada: ' + mon(ac.g), '',
       'LOGÍSTICA', 'Rendido ayer: ' + mon(ayer), 'Afectado hoy: ' + mon(af), 'Diferencia: ' + mon(r2(ayer - af))];
     if (lg.correccion) L_.push('Corrección: ' + mon(lg.correccion));
     L_.push('Diferencia acumulada: ' + mon(la));
@@ -428,12 +425,33 @@ button,input{font:inherit}
     return d[a.length][b.length];
   }
   // Busca el cliente. exacto = mismo nombre; parecido = una sola opción cercana; null = no se pudo identificar.
+  // El apellido va primero. Se ignoran palabras de relleno y nombres de pila.
+  const RELLENO = new Set(['SUC', 'SUCESION', 'COM', 'COMERCIAL', 'DIST', 'DISTRIBUIDORA', 'DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'SA', 'SRL', 'CIA', 'SH', 'Y', 'E', 'HNOS', 'HERMANOS', 'S', 'R', 'L']);
+  const DESCARTAR = ['MILLAN', 'CENCOSUD', 'CENTRAPAL'];
+  const esDescartado = (nombre) => { const n = ' ' + normNom(nombre) + ' '; return DESCARTAR.some((d) => n.indexOf(' ' + d) >= 0); };
+  const clave = (x) => normNom(x).split(' ').filter((t) => t && !RELLENO.has(t));
+  function porApellido(clients, nombre) {
+    const t = clave(nombre); if (!t.length) return null;
+    const cand = clients.map((c) => ({ c, k: clave(c.name) })).filter((x) => x.k.length && x.k[0] === t[0] && (x.k.length === 1 || (x.k.length === 2 && x.k[1].length === 1)));
+    if (!cand.length) return null;
+    const conIni = cand.filter((x) => x.k.length === 2), sinIni = cand.filter((x) => x.k.length === 1);
+    if (conIni.length) {
+      // apellido repetido: se separa por la inicial del nombre; si no se sabe, no se adivina
+      const inis = t.slice(1).map((w) => w[0]);
+      const m = conIni.filter((x) => inis.indexOf(x.k[1]) >= 0);
+      if (m.length === 1 && !sinIni.length) return m[0].c.id;
+      return null;
+    }
+    return sinIni.length === 1 ? sinIni[0].c.id : null;
+  }
   function buscarCliente(clients, nombre) {
     const n = normNom(nombre); if (!n) return null;
     const lista = clients.map((c) => ({ c, n: normNom(c.name) }));
     const ex = lista.filter((x) => x.n === n);
     if (ex.length === 1) return { id: ex[0].c.id, tipo: 'exacto' };
     if (ex.length > 1) return null;
+    const ap = porApellido(clients, nombre);
+    if (ap) return { id: ap, tipo: 'exacto' };
     const dist = lista.map((x) => ({ x, d: lev(n, x.n) })).sort((p, q) => p.d - q.d);
     const lim = n.length >= 9 ? 2 : n.length >= 5 ? 1 : 0;
     if (dist.length && dist[0].d <= lim && (dist.length < 2 || dist[1].d > dist[0].d)) return { id: dist[0].x.c.id, tipo: 'parecido' };
@@ -445,10 +463,24 @@ button,input{font:inherit}
   function armarLista(db, texto, campo, fecha) {
     const r = leerLista(texto), activos = db.clients;
     const filas = r.filas.map((f) => {
+      if (esDescartado(f.nombre)) return { nombre: f.nombre, monto: f.monto, id: null, estado: 'omitir', auto: true };
       const b = buscarCliente(activos, f.nombre);
       return { nombre: f.nombre, monto: f.monto, id: b ? b.id : null, estado: b ? b.tipo : 'sin' };
     });
     return { filas, ignoradas: r.ignoradas, totalDeclarado: r.totalDeclarado, campo, fecha };
+  }
+  // Avisa si parece la misma planilla cargada dos veces o si se pisarían datos ya cargados.
+  function avisoRepetida(db, lista) {
+    const dias = Object.keys(db.allTxns || {}).filter((d) => d < lista.fecha && Object.keys(db.allTxns[d]).some((k) => k !== '__meta__' && ((db.allTxns[d][k] || {})[lista.campo])));
+    const prev = dias.sort().pop();
+    const por = {};
+    lista.filas.forEach((f) => { if (f.id && f.estado !== 'omitir') por[f.id] = r2((por[f.id] || 0) + f.monto); });
+    const ids = Object.keys(por);
+    let iguales = 0;
+    if (prev) ids.forEach((id) => { const v = (db.allTxns[prev][id] || {})[lista.campo]; if (v && Math.abs(v - por[id]) < 0.005) iguales++; });
+    const hoy = db.allTxns[lista.fecha] || {};
+    const reemplaza = ids.filter((id) => (hoy[id] || {})[lista.campo] && Math.abs((hoy[id] || {})[lista.campo] - por[id]) > 0.004).length;
+    return { iguales, prev: prev || null, reemplaza, repetida: !!prev && iguales >= 3 && iguales >= ids.length / 2, pisa: reemplaza >= 3 };
   }
   // Aplica una lista revisada. Suma si el mismo cliente aparece en varias filas. Devuelve lo cargado.
   function aplicarLista(db, lista, setVal) {
@@ -458,14 +490,61 @@ button,input{font:inherit}
     return { clientes: Object.keys(por).length, total: r2(Object.values(por).reduce((a, b) => a + b, 0)) };
   }
 
-  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes, diaAnterior, detalleArqueo, leerLista, buscarCliente, armarLista, aplicarLista, normNom };
+  // ---- Carga masiva de teléfonos y mails ----
+  function limpiarTel(t) { return String(t).replace(/[^\d+\-\s()./]/g, '').replace(/\s+/g, ' ').trim(); }
+  function leerContactos(texto) {
+    const filas = [], ignoradas = [];
+    String(texto || '').split(/\r?\n/).forEach((raw) => {
+      const linea = raw.replace(/^﻿/, '').trim(); if (!linea) return;
+      const sep = linea.indexOf('\t') >= 0 ? '\t' : linea.indexOf(';') >= 0 ? ';' : linea.indexOf('|') >= 0 ? '|' : ',';
+      const cel = linea.split(sep).map((x) => x.trim().replace(/^"|"$/g, '').trim());
+      const nombre = cel[0]; if (!nombre) { ignoradas.push(linea); return; }
+      if (['CLIENTE', 'NOMBRE', 'CLIENTES'].includes(normNom(nombre)) && cel.slice(1).some((x) => /tel|mail|correo|cel/i.test(x))) return;
+      let tel = '', mail = '', avisos = [];
+      cel.slice(1).forEach((x) => {
+        if (!x) return;
+        if (x.indexOf('@') >= 0) {
+          const m = x.toLowerCase().replace(/\s+/g, '');
+          if (/^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]{2,}$/.test(m)) { if (!mail) mail = m; } else avisos.push('Mail no válido: ' + x);
+        } else if ((x.match(/\d/g) || []).length >= 6) {
+          const t = limpiarTel(x), n = (t.match(/\d/g) || []).length;
+          if (!tel) { tel = t; if (n < 8 || n > 15) avisos.push('Revisá el teléfono: ' + t); }
+        } else avisos.push('No entendí: ' + x);
+      });
+      if (!tel && !mail) { ignoradas.push(linea); return; }
+      filas.push({ linea, nombre, tel, mail, avisos });
+    });
+    return { filas, ignoradas };
+  }
+  function armarContactos(db, texto) {
+    const r = leerContactos(texto);
+    const filas = r.filas.map((f) => { const b = buscarCliente(db.clients, f.nombre); return Object.assign({}, f, { id: b ? b.id : null, estado: b ? b.tipo : 'sin' }); });
+    return { filas, ignoradas: r.ignoradas };
+  }
+  // Aplica: solo completa o cambia lo que viene con dato. Nunca borra un teléfono o mail existente.
+  function aplicarContactos(db, lista) {
+    let tel = 0, mail = 0; const vistos = {};
+    lista.filas.forEach((f) => {
+      if (!f.id || f.estado === 'omitir') return;
+      const c = db.clients.find((x) => x.id === f.id); if (!c) return;
+      if (f.tel && c.telefono !== f.tel) { c.telefono = f.tel; tel++; }
+      if (f.mail && c.email !== f.mail) { c.email = f.mail; mail++; }
+      vistos[f.id] = 1;
+    });
+    return { clientes: Object.keys(vistos).length, tel, mail };
+  }
+  function csvContactos(db) {
+    const q = (x) => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"';
+    const orden = db.clients.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'));
+    return '﻿' + ['Cliente;Teléfono;Mail'].concat(orden.map((c) => [q(c.name), q(c.telefono || ''), q(c.email || '')].join(';'))).join('\r\n');
+  }
+
+  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes, diaAnterior, detalleArqueo, leerLista, avisoRepetida, esDescartado, leerContactos, armarContactos, aplicarContactos, csvContactos, buscarCliente, armarLista, aplicarLista, normNom };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.R284 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
-
 </script>
-<script>
-'use strict';
+<script>'use strict';
 // Arma un archivo .xlsx (Excel) sin librerías y sin internet.
 (function (root) {
   const enc = new TextEncoder();
@@ -519,13 +598,11 @@ button,input{font:inherit}
   const api = { makeXlsx, crc32 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.R284X = api;
 })(typeof window !== 'undefined' ? window : globalThis);
-
 </script>
-<script>
-'use strict';
+<script>'use strict';
 (function () {
   const root = window;
-  const VERSION = 15;
+  const VERSION = 18;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -543,7 +620,7 @@ button,input{font:inherit}
   }
   let DB = loadDB();
   function persist() {
-    try { localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
+    try { DB.config.cambio = Date.now(); localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
     catch (e) { toast('No se pudo guardar en el celular. Hacé un respaldo y avisá.', 5000); return false; }
   }
 
@@ -703,6 +780,7 @@ button,input{font:inherit}
     const dom = dateObj(S.fecha).getDay() === 0;
     return header('Cierre del día', true) +
       (dom ? '<div style="padding:8px 12px 0"><div class="banner">Es domingo: normalmente no se trabaja. Podés cargar igual si hace falta.</div></div>' : '') +
+      respaldoBanner() +
       (diaBloqueado(S.fecha) ? lockBanner() : '') +
       `<div class="search"><input id="q" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="btn sm ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">Con saldo</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Todos abiertos' : 'Abrir todos'}</button><button class="btn sm ghost" data-a="pg-abrir" style="flex-basis:100%">📋 Pegar lista (foto leída por Claude)</button></div>` +
       `<div class="body" id="list">${listHTML()}</div><div class="foot" id="foot">${footHTML()}</div>` + nav();
@@ -721,6 +799,72 @@ button,input{font:inherit}
     else cuerpo = 'Mirá la foto con los cobros en efectivo. Para cada cliente tomá el nombre y el monto cobrado. Si el mismo cliente aparece varias veces, sumalo en un solo renglón.';
     return cuerpo + '\n\n' + fmt + '\n\nMi lista de clientes: ' + quien + '.';
   }
+  // ---------- Lector de fotos con IA (por un intermediario propio) ----------
+  function lectorCfg() {
+    const c = DB.config.lector; return c && c.url && c.clave ? c : null;
+  }
+  function viewLector() {
+    const c = lectorCfg();
+    return subHeader('Lector de fotos') + `<div class="body">
+<section class="card sec"><h2>${c ? 'Configurado ✓' : 'Falta configurar'}</h2>
+<p>El lector usa un <b>código</b> que te da el titular. Se pega una sola vez en cada celular.</p>
+${c ? '<p style="word-break:break-all"><small>Conectado a: ' + esc(c.url) + '</small></p>' : ''}
+<textarea id="lc-cod" rows="3" placeholder="Pegá acá el código del lector" style="width:100%;border-radius:12px;border:1px solid #C9D3D0;padding:10px;font:14px ui-monospace,Menlo,Consolas,monospace"></textarea>
+<div class="btns" style="margin-top:8px"><button class="btn green" data-a="lc-guardar">GUARDAR CÓDIGO</button><button class="btn ghost" data-a="lc-pegar">PEGAR</button></div></section>
+${c ? `<section class="card sec"><h2>Para el titular</h2><button class="btn ghost" data-a="lc-copiar" style="width:100%">COPIAR EL CÓDIGO (para el empleado)</button><div class="btns" style="margin-top:8px"><button class="btn ghost" data-a="lc-probar">PROBAR CONEXIÓN</button><button class="btn red" data-a="lc-quitar">QUITAR</button></div></section>` : ''}</div>` + nav();
+  }
+  function lcGuardar() {
+    const e = document.getElementById('lc-cod'); const t = (e ? e.value : '').trim();
+    const i = t.indexOf('|'); const url = i > 0 ? t.slice(0, i).trim() : '', clave = i > 0 ? t.slice(i + 1).trim() : '';
+    if (!/^https:\/\/[^\s|]+$/.test(url) || clave.length < 8) return toast('El código no es válido. Tiene que ser como https://…|clave', 4500);
+    DB.config.lector = { url, clave }; if (persist()) { toast('Lector configurado ✓', 3000); render(); }
+  }
+  async function llamarLector(imagenes, prompt) {
+    const c = lectorCfg(); if (!c) throw new Error('Falta configurar el lector (Más → Lector de fotos).');
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 90000);
+    let r;
+    try { r = await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App-Token': c.clave }, body: JSON.stringify({ imagenes, prompt }), signal: ctl.signal }); }
+    catch (e) { throw new Error(e && e.name === 'AbortError' ? 'Tardó demasiado. Probá de nuevo.' : 'No hay internet o el lector no responde.'); }
+    finally { clearTimeout(to); }
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    if (!r.ok || !j.texto) throw new Error(j.error || 'El lector devolvió un error (' + r.status + ').');
+    return j.texto;
+  }
+  function achicarFoto(file) {
+    return new Promise((ok, mal) => {
+      const url = URL.createObjectURL(file), im = new Image();
+      im.onload = () => {
+        const M = 1800, k = Math.min(1, M / Math.max(im.width, im.height)), cv = document.createElement('canvas');
+        cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height); URL.revokeObjectURL(url);
+        ok(cv.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se pudo abrir la foto.')); };
+      im.src = url;
+    });
+  }
+  async function pgFotoAgregar(files) {
+    const P = S.pegar; P.fotos = P.fotos || [];
+    for (const f of Array.from(files)) {
+      if (P.fotos.length >= 4) { toast('Máximo 4 fotos por lectura.', 3000); break; }
+      try { P.fotos.push(await achicarFoto(f)); } catch (e) { toast(e.message, 3500); }
+    }
+    const e = document.getElementById('pg-txt'); if (e) P.texto = e.value;
+    render();
+  }
+  async function pgLeerFotos() {
+    const P = S.pegar; if (!P.fotos || !P.fotos.length) return toast('Primero sacá una foto.', 3000);
+    if (diaBloqueado(S.fecha)) return toast('El día está guardado. Destrabalo primero.', 3500);
+    if (!lectorCfg()) return toast('Falta configurar el lector.', 3000);
+    P.leyendo = true; render();
+    try {
+      const txt = await llamarLector(P.fotos, pgInstrucciones(P.campo));
+      P.leyendo = false; P.texto = txt; P.fotos = [];
+      const lista = L.armarLista(DB, txt, P.campo, S.fecha);
+      if (!lista.filas.length) { toast('La IA no encontró montos. Revisá el texto o probá otra foto.', 5000); return render(); }
+      P.lista = lista; P.totalEsperado = null; P.paso = 'revisar'; render();
+    } catch (e) { P.leyendo = false; render(); toast(e.message + ' No se cambió nada.', 6000); }
+  }
   function viewPegar() {
     const P = S.pegar, f = S.fecha;
     if (P.paso === 'revisar') return viewPegarRevisar();
@@ -729,9 +873,15 @@ button,input{font:inherit}
 ${lk ? '<div class="banner"><b>El día ' + esc(fechaLarga(f)) + ' está guardado.</b> Volvé a Cierre y destrabalo antes de pegar una lista.</div>' : ''}
 <section class="card sec"><h2>1. ¿Qué lista es?</h2><div class="chips">${PG_CAMPOS.map((x) => `<button class="btn sm ${P.campo === x[0] ? 'on' : 'ghost'}" data-a="pg-campo" data-v="${x[0]}">${x[1]}</button>`).join('')}</div>
 <p style="margin:10px 0 0">Se carga en <b>${esc(fechaLarga(f))}</b>.</p></section>
-<section class="card sec"><h2>2. Sacale la foto a Claude</h2><p>Abrí la app de Claude, mandale la foto junto con las instrucciones y copiá la lista que te devuelva.</p>
-<button class="btn ghost" data-a="pg-copiar" style="width:100%">COPIAR INSTRUCCIONES PARA CLAUDE</button></section>
-<section class="card sec"><h2>3. Pegá la lista acá</h2>
+<section class="card sec"><h2>2. ${lectorCfg() ? 'Sacá la foto' : 'Leé la foto con Claude'}</h2>
+${lectorCfg() ? `<p>${(P.fotos || []).length ? '<b>' + P.fotos.length + ' foto(s) lista(s).</b> Podés agregar otra si la planilla tiene más hojas.' : 'Sacá la foto de la planilla. Si tiene varias hojas, sacá una foto de cada una.'}</p>
+<div class="btns"><button class="btn ghost" data-a="pg-foto"${P.leyendo ? ' disabled' : ''}>📷 ${(P.fotos || []).length ? 'AGREGAR OTRA FOTO' : 'SACAR FOTO / ELEGIR'}</button>${(P.fotos || []).length ? '<button class="btn ghost" data-a="pg-fotoborrar">QUITAR FOTOS</button>' : ''}</div>
+<button class="btn green" data-a="pg-leerfotos" style="width:100%;margin-top:8px${P.leyendo || !(P.fotos || []).length ? ';opacity:.4' : ''}"${P.leyendo || !(P.fotos || []).length ? ' disabled' : ''}>${P.leyendo ? 'LEYENDO… (puede tardar 20 segundos)' : 'LEER FOTO CON IA'}</button>
+<input id="pg-foto" type="file" accept="image/*" multiple hidden>
+<details style="margin-top:12px"><summary><small>Alternativa: usar la app de Claude a mano</small></summary><p>Abrí tu proyecto de Claude, mandale la foto y copiá la lista que te devuelva.</p>
+<button class="btn ghost" data-a="pg-copiar" style="width:100%">COPIAR INSTRUCCIONES PARA CLAUDE</button></details>` : `<p>Abrí tu proyecto de Claude, mandale la foto y copiá la lista que te devuelva. Después pegala abajo.</p>
+<button class="btn ghost" data-a="pg-copiar" style="width:100%">COPIAR INSTRUCCIONES PARA CLAUDE (si las necesitás)</button>`}</section>
+<section class="card sec"><h2>3. Revisá o pegá la lista</h2>
 <textarea id="pg-txt" rows="8" placeholder="ACOSTA;12345,67&#10;ANDRADA;5000,00&#10;TOTAL;17345,67" style="width:100%;border-radius:12px;border:1px solid #C9D3D0;padding:10px;font:14px ui-monospace,Menlo,Consolas,monospace">${esc(P.texto || '')}</textarea>
 <div class="btns" style="margin-top:8px"><button class="btn ghost" data-a="pg-pegar">PEGAR DEL PORTAPAPELES</button></div></section></div>
 <div class="foot"><button class="btn green" data-a="pg-leer" style="flex:1${lk ? ';opacity:.4' : ''}"${lk ? ' disabled' : ''}>LEER LISTA</button></div>` + nav();
@@ -752,7 +902,7 @@ ${lk ? '<div class="banner"><b>El día ' + esc(fechaLarga(f)) + ' está guardado
       const cl = DB.clients.find((c) => c.id === x.id), t0 = x.id ? getT(Ls.fecha, x.id) : null, ya = t0 && t0[Ls.campo];
       const cls_ = x.estado === 'omitir' ? 'pg om' : !x.id ? 'pg rojo' : x.estado === 'exacto' ? 'pg verde' : x.estado === 'manual' ? 'pg verde' : 'pg amar';
       const nota = x.estado === 'omitir' ? 'No se carga' : !x.id ? 'Sin identificar: elegilo' : x.estado === 'parecido' ? 'Parece: ' + esc(cl.name) + ' — revisalo' : x.estado === 'manual' ? 'Elegido a mano: ' + esc(cl.name) : '';
-      return `<div class="card ${cls_}"><div class="pgh"><b>${esc(x.nombre)}</b><b>${L.fmtAR(x.monto)}</b></div>${nota ? `<small>${nota}</small>` : ''}${ya && x.id && Math.abs(ya - x.monto) > 0.004 ? `<small>Ya tenía ${L.fmtAR(ya)}: se reemplaza</small>` : ''}<select data-pgsel="${i}" aria-label="Cliente para ${esc(x.nombre)}">${opts(x)}</select></div>`;
+      return `<div class="card ${cls_}"><div class="pgh"><b>${esc(x.nombre)}</b><b>${L.fmtAR(x.monto)}</b></div>${x.auto ? '<small>Descartado solo (MILLÁN / CENCOSUD / CENTRAPAL). Elegí un cliente si querés cargarlo.</small>' : ''}${nota && !x.auto ? `<small>${nota}</small>` : ''}<label class="f" style="margin:6px 0 0">Monto<input type="text" inputmode="decimal" data-pgm="${i}" value="${L.fmtAR(x.monto)}"></label>${ya && x.id && Math.abs(ya - x.monto) > 0.004 ? `<small>Ya tenía ${L.fmtAR(ya)}: se reemplaza</small>` : ''}<select data-pgsel="${i}" aria-label="Cliente para ${esc(x.nombre)}">${opts(x)}</select></div>`;
     }).join('');
     return subHeader('Revisar lista') + `<div class="body">
 <section class="card res"><div class="rline big"><span>${esc(pgNombre(Ls.campo))} · ${esc(fechaCorta(Ls.fecha))}</span></div>
@@ -778,8 +928,10 @@ ${filas || '<div class="empty">No se encontró ningún renglón con un monto.</d
     const Ls = S.pegar.lista, r = pgResumen(Ls);
     if (r.sin) return toast('Faltan clientes por identificar.', 3000);
     if (diaBloqueado(Ls.fecha)) return toast('El día está guardado. Destrabalo primero.', 3500);
-    S.modal = { title: '¿Cargar la lista?', ok: 'OK, CARGAR', cancel: 'ATRÁS',
-      text: `Se cargan <b>${r.n} clientes</b> en <b>${esc(pgNombre(Ls.campo))}</b> del ${esc(fechaLarga(Ls.fecha))}: total <b>${L.fmtAR(r.total)}</b>.<br><br>Después tocá GUARDAR DÍA en Cierre.`,
+    const av = L.avisoRepetida(DB, Ls);
+    const avisos = (av.repetida ? `<b style="color:#B3261E">¿Es la misma planilla de ayer?</b> ${av.iguales} clientes tienen exactamente los mismos importes que el ${esc(fechaCorta(av.prev))}.<br><br>` : '') + (av.pisa ? `<b style="color:#B3261E">Ojo:</b> ya hay datos cargados en ${av.reemplaza} clientes y se van a reemplazar.<br><br>` : '');
+    S.modal = { title: avisos ? '¡Revisá antes de cargar!' : '¿Cargar la lista?', ok: avisos ? 'CARGAR IGUAL' : 'OK, CARGAR', cancel: avisos ? 'CANCELAR' : 'ATRÁS',
+      text: avisos + `Se cargan <b>${r.n} clientes</b> en <b>${esc(pgNombre(Ls.campo))}</b> del ${esc(fechaLarga(Ls.fecha))}: total <b>${L.fmtAR(r.total)}</b>.<br><br>Después tocá GUARDAR DÍA en Cierre.`,
       onOk: () => { const c = L.aplicarLista(DB, Ls, setVal); S.pegar = null; toast('Listo: ' + c.clientes + ' clientes cargados. Recordá GUARDAR DÍA.', 4500); } };
     render();
   }
@@ -798,6 +950,8 @@ ${filas || '<div class="empty">No se encontró ningún renglón con un monto.</d
       case 'historial': return viewHistorial();
       case 'clientes': return viewClientes();
       case 'cform': return viewCForm();
+      case 'cmasivo': return viewCMasivo();
+      case 'lector': return viewLector();
       case 'notas': return viewNotas();
       case 'respaldo': return viewRespaldo();
       case 'archivar': return viewArchivar();
@@ -816,19 +970,20 @@ ${filas || '<div class="empty">No se encontró ningún renglón con un monto.</d
 ${sab ? '<div class="banner"><b>Es sábado:</b> hacé el respaldo y guardalo en tu Drive.</div>' : ''}
 ${row('limpiar', 'Limpiar (Cierre diario)', 'Borra compras y pagos de ' + esc(fechaLarga(S.fecha)), true)}
 ${DB.undo ? `<button class="mrow" data-a="menu" data-v="undo" style="border-color:#E8B65A;background:#FFF8E8"><span><b>Deshacer la última limpieza</b><small>Día ${esc(fechaLarga(DB.undo.fecha))}</small></span><span aria-hidden="true">↶</span></button>` : ''}
-${row('resumen', 'Resumen del día', 'Cierre, arqueo y logística en un texto para compartir', false)}
-${row('retiros', 'Retiros del mes', 'Retiro NF y ajustes de ROKE y NICOLAS', true)}
+${row('resumen', 'Resumen del día', 'Cierre, arqueo y logística en un texto para compartir', true)}
+${row('retiros', 'Retiros del mes', 'Retiro y ajustes de ROKE y NICOLAS', true)}
 ${row('historial', 'Historial', 'Movimientos y saldo de cada cliente', false)}
 ${row('clientes', 'Clientes', 'Altas, bajas, mail, teléfono y saldo inicial', true)}
 ${row('notas', 'Bitácora', 'Notas del día', false)}
 ${row('pasar', 'Pasar datos entre celulares', 'Enviar cierre, sumar cierre y saldos', false)}
+${row('lector', 'Lector de fotos', DB.config.lector ? 'Configurado ✓' : 'Falta configurar (pegar el código)', false)}
 ${row('respaldo', 'Respaldo', 'Hacer o restaurar el archivo de respaldo', true)}
 ${row('archivar', 'Limpiar historial viejo', 'Si la app se pone lenta: borra días anteriores y deja los saldos', true)}
 <div class="empty" style="padding:14px 6px;font-size:13px">${DB.clients.length} clientes · ${dias} días guardados en este celular · versión ${VERSION}</div></div>` + nav();
   }
 
   function viewRespaldo() {
-    return subHeader('Respaldo') + `<div class="body"><section class="card sec"><h2>Respaldo</h2><p>Hacé un respaldo seguido. Es un archivo que queda en Descargas y se puede mandar por WhatsApp.</p>
+    return subHeader('Respaldo') + `<div class="body"><section class="card sec"><h2>Respaldo</h2><p>Hacé un respaldo seguido. Es un archivo que queda en Descargas y se puede mandar por WhatsApp.</p><p><b>${DB.config.respaldo ? 'Último respaldo: ' + esc(fechaCorta(ymd(new Date(DB.config.respaldo)))) : 'Todavía no hiciste ningún respaldo.'}</b></p><button class="btn green" data-a="resp-ya" style="width:100%;margin-bottom:10px">RESPALDAR AHORA (elegir Drive)</button>
 <label class="chk"><input type="checkbox" data-opt="rJ" ${S.rJ ? 'checked' : ''}><span><b>Archivo de respaldo (.json)</b><small>Sirve para restaurar la app</small></span></label>
 <label class="chk"><input type="checkbox" data-opt="rX" ${S.rX ? 'checked' : ''}><span><b>Planilla de Excel (.xlsx)</b><small>Saldos, movimientos, arqueo y logística para mirar o imprimir</small></span></label>
 <div class="btns"><button class="btn" data-a="respaldo">Hacer respaldo</button><button class="btn red" data-a="restaurar">Restaurar</button></div>
@@ -873,7 +1028,43 @@ ${row('archivar', 'Limpiar historial viejo', 'Si la app se pone lenta: borra dí
   }
   function viewClientes() {
     return subHeader('Clientes', '<button class="chip" data-a="cnew" style="background:#F2B544;color:#2A1B00;font-weight:800">+ Nuevo</button>') +
-      `<div class="search"><input id="hq" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.hq)}"><button class="btn sm ${S.verInact ? 'on' : 'ghost'}" data-a="cinact" aria-pressed="${S.verInact}">Ver inactivos</button></div><div class="body" id="list2">${cliListHTML()}</div>` + nav();
+      `<div class="search"><input id="hq" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.hq)}"><button class="btn sm ${S.verInact ? 'on' : 'ghost'}" data-a="cinact" aria-pressed="${S.verInact}">Ver inactivos</button><button class="btn sm ghost" data-a="cm-abrir" style="flex-basis:100%">📇 Carga masiva de teléfonos y mails</button></div><div class="body" id="list2">${cliListHTML()}</div>` + nav();
+  }
+  function viewCMasivo() {
+    const P = S.cmas || (S.cmas = { paso: 'texto', texto: '' });
+    if (P.paso === 'revisar') return viewCMasivoRevisar();
+    return subHeader('Carga masiva') + `<div class="body">
+<section class="card sec"><h2>Opción A: con una planilla</h2><p>Bajá la lista de tus clientes en una planilla (se abre con Excel o Google Sheets), completá las columnas Teléfono y Mail, copiá esas filas y pegalas abajo.</p>
+<button class="btn ghost" data-a="cm-planilla" style="width:100%">DESCARGAR PLANILLA DE CLIENTES</button></section>
+<section class="card sec"><h2>Pegá la lista</h2><p>Un cliente por renglón: <b>NOMBRE ; TELÉFONO ; MAIL</b>. Sirve separado por tabulación (copiado de una planilla), punto y coma o barra |. Si falta el mail o el teléfono, se carga solo lo que venga.</p>
+<textarea id="cm-txt" rows="9" placeholder="ACOSTA;2615551234;acosta@correo.com&#10;GASTRO;2614445678;" style="width:100%;border-radius:12px;border:1px solid #C9D3D0;padding:10px;font:14px ui-monospace,Menlo,Consolas,monospace">${esc(P.texto || '')}</textarea>
+<div class="btns" style="margin-top:8px"><button class="btn ghost" data-a="cm-pegar">PEGAR DEL PORTAPAPELES</button></div></section></div>
+<div class="foot"><button class="btn green" data-a="cm-leer" style="flex:1">LEER LISTA</button></div>` + nav();
+  }
+  function cmResumen(Ls) {
+    const act = Ls.filas.filter((x) => x.id && x.estado !== 'omitir');
+    return { n: act.length, tel: act.filter((x) => x.tel).length, mail: act.filter((x) => x.mail).length, sin: Ls.filas.filter((x) => !x.id && x.estado !== 'omitir').length, omit: Ls.filas.filter((x) => x.estado === 'omitir').length };
+  }
+  function viewCMasivoRevisar() {
+    const Ls = S.cmas.lista, r = cmResumen(Ls);
+    const opts = (x) => '<option value="">— elegir cliente —</option><option value="__omitir"' + (x.estado === 'omitir' ? ' selected' : '') + '>NO CARGAR esta línea</option>' + DB.clients.map((c) => `<option value="${esc(c.id)}"${x.id === c.id && x.estado !== 'omitir' ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+    const filas = Ls.filas.map((x, i) => {
+      const cl = DB.clients.find((c) => c.id === x.id);
+      const cls_ = x.estado === 'omitir' ? 'pg om' : !x.id ? 'pg rojo' : x.estado === 'parecido' || x.avisos.length ? 'pg amar' : 'pg verde';
+      const nota = x.estado === 'omitir' ? 'No se carga' : !x.id ? 'Sin identificar: elegilo' : x.estado === 'parecido' ? 'Parece: ' + esc(cl.name) + ' — revisalo' : x.estado === 'manual' ? 'Elegido a mano: ' + esc(cl.name) : '';
+      const ya = [];
+      if (cl && x.tel && cl.telefono && cl.telefono !== x.tel) ya.push('Ya tenía el teléfono ' + esc(cl.telefono) + ': se reemplaza');
+      if (cl && x.mail && cl.email && cl.email !== x.mail) ya.push('Ya tenía el mail ' + esc(cl.email) + ': se reemplaza');
+      return `<div class="card ${cls_}"><div class="pgh"><b>${esc(x.nombre)}</b></div>${x.tel ? `<small>📞 ${esc(x.tel)}</small>` : ''}${x.mail ? `<small>✉️ ${esc(x.mail)}</small>` : ''}${nota ? `<small>${nota}</small>` : ''}${x.avisos.map((m) => `<small>⚠️ ${esc(m)}</small>`).join('')}${ya.map((m) => `<small>${m}</small>`).join('')}<select data-cmsel="${i}" aria-label="Cliente para ${esc(x.nombre)}">${opts(x)}</select></div>`;
+    }).join('');
+    return subHeader('Revisar contactos') + `<div class="body">
+<section class="card res"><div class="rline"><span>Renglones leídos</span><b>${Ls.filas.length}</b></div>
+<div class="rline"><span>Clientes que se actualizan</span><b>${r.n}</b></div>
+<div class="rline"><span>Teléfonos / mails</span><b>${r.tel} / ${r.mail}</b></div>
+${r.sin ? `<div class="rline"><span>Sin identificar</span><span class="bdg warn">${r.sin}</span></div>` : ''}${r.omit ? `<div class="rline"><span>No se cargan</span><b>${r.omit}</b></div>` : ''}</section>
+${Ls.ignoradas.length ? `<div class="banner"><b>${Ls.ignoradas.length} renglón(es) no se pudieron leer:</b><br>${Ls.ignoradas.map(esc).join('<br>')}</div>` : ''}
+${filas || '<div class="empty">No se encontró ningún teléfono ni mail.</div>'}</div>
+<div class="foot"><button class="btn ghost" data-a="cm-atras" style="flex:1">ATRÁS</button><button class="btn green" data-a="cm-aplicar" style="flex:1.4${r.sin || !r.n ? ';opacity:.4' : ''}"${r.sin || !r.n ? ' disabled' : ''}>ACTUALIZAR CLIENTES</button></div>` + nav();
   }
   function viewCForm() {
     const nuevo = S.edit === 'nuevo';
@@ -948,12 +1139,33 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
   async function entregar(nombre, blob, aviso) {
     try {
       const f = new File([blob], nombre, { type: blob.type });
-      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: nombre }); return toast('Listo, enviado.', 3000); }
-    } catch (e) { if (e && e.name === 'AbortError') return toast('Se canceló el envío.', 3000); }
-    bajar(nombre, blob); toast(aviso || 'Archivo guardado en Descargas.', 4500);
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: nombre }); toast('Listo, enviado.', 3000); return true; }
+    } catch (e) { if (e && e.name === 'AbortError') { toast('Se canceló el envío.', 3000); return false; } }
+    bajar(nombre, blob); toast(aviso || 'Archivo guardado en Descargas.', 4500); return true;
   }
   const datosCompletos = () => ({ exportedAt: new Date().toISOString(), clients: DB.clients, allTxns: DB.allTxns, arqueo: DB.arqueo, logisticaTxns: DB.logisticaTxns, baseSemana: DB.baseSemana, notas: DB.notas });
+  function marcarRespaldo() {
+    DB.config.respaldo = Date.now();
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {}
+  }
+  function respaldoPendiente() {
+    const c = DB.config, r = c.respaldo || 0;
+    if (!c.cambio || !DB.clients.length) return null;
+    if (r && ymd(new Date(r)) === today()) return null;
+    if (r && c.cambio <= r) return null;
+    return r;
+  }
+  function respaldoBanner() {
+    const r = respaldoPendiente(); if (r === null) return '';
+    const cuando = r ? 'Último respaldo: ' + fechaCorta(ymd(new Date(r))) + '.' : 'Todavía no hiciste ningún respaldo.';
+    return `<div style="padding:8px 12px 0"><div class="banner" style="background:#FDE7E5;border-color:#B3261E;color:#8C1D18"><b>⚠️ Respaldo pendiente.</b> ${cuando} Si se pierde el celular se pierde todo.<br><button class="btn red sm" data-a="resp-ya" style="margin-top:8px;width:100%">RESPALDAR AHORA (Drive, WhatsApp…)</button></div></div>`;
+  }
+  async function respaldoRapido() {
+    const ok = await entregar('respaldo-cuenta-corriente-' + today() + '.json', new Blob([JSON.stringify(datosCompletos(), null, 2)], { type: 'application/json' }), 'Respaldo guardado en Descargas. Subilo a tu Drive.');
+    if (ok) { marcarRespaldo(); render(); }
+  }
   function hacerRespaldo() {
+    marcarRespaldo();
     if (!S.rJ && !S.rX) return toast('Elegí al menos un archivo.', 3000);
     let demora = 0;
     if (S.rJ) { bajar('respaldo-cuenta-corriente-' + today() + '.json', new Blob([JSON.stringify(datosCompletos(), null, 2)], { type: 'application/json' })); demora = 700; }
@@ -1025,7 +1237,7 @@ ${R('Diferencia', 'ar-rd1', x.d1)}${R('Acumulado', 'ar-ra1', L.r2(p.c1 + x.d1))}
 ${inp('ar-d2', 'Depositado', fv(rec.depositado2), 'data-arq="1"')}
 ${R('Diferencia', 'ar-rd2', x.d2)}${R('Acumulado', 'ar-ra2', L.r2(p.c2 + x.d2))}</section>
 <section class="card sec"><h2>Retiro y depósito general</h2><div class="grid2">
-${inp('ar-nf', 'Retiro no facturado', fv(rec.retiroNF), 'data-arq="1"')}${inp('ar-gen', 'Depositado general', fv(rec.depositadoGeneral), 'data-arq="gen"', rec.depositadoGeneral != null && DB.arqueo[f] ? 'data-touched="1"' : '')}
+${inp('ar-nf', 'Retiro', fv(rec.retiroNF), 'data-arq="1"')}${inp('ar-gen', 'Depositado general', fv(rec.depositadoGeneral), 'data-arq="gen"', rec.depositadoGeneral != null && DB.arqueo[f] ? 'data-touched="1"' : '')}
 </div><p style="margin:10px 0 0">El general se completa solo (COB 1 + COB 2 − retiro). Si el banco te dio otro número, escribilo.</p></section>
 <section class="card res">${R('Total diferencia del día', 'ar-rdg', x.dg, true)}${R('Total acumulado', 'ar-rag', L.r2(p.g + x.dg), true)}
 <p style="margin:8px 0 0;font-size:12px;color:#55625F">"Faltan" = se cobró más de lo que se depositó. "Sobran" = se depositó de más.</p></section>
@@ -1097,7 +1309,7 @@ ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${inp('l
   function viewRetiros() {
     const ym = S.rmes || today().slice(0, 7), r = L.retirosMes(DB, ym), [y, m] = ym.split('-').map(Number);
     const mes = new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-    const filas = r.filas.map((x) => `<div class="card" style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><span><b>${esc(x.fecha.slice(8, 10) + '/' + x.fecha.slice(5, 7) + '/' + x.fecha.slice(0, 4))}</b><small style="display:block;color:#55625F">${x.nf ? 'Retiro NF ' + L.fmtAR(x.nf) : ''}${x.ajustes.map((j) => (x.nf ? ' · ' : '') + 'Ajuste ' + esc(j.nombre) + ' ' + L.fmtAR(j.monto)).join('')}</small></span><b>${L.fmtAR(x.total)}</b></div>`).join('');
+    const filas = r.filas.map((x) => `<div class="card" style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><span><b>${esc(x.fecha.slice(8, 10) + '/' + x.fecha.slice(5, 7) + '/' + x.fecha.slice(0, 4))}</b><small style="display:block;color:#55625F">${x.nf ? 'Retiro ' + L.fmtAR(x.nf) : ''}${x.ajustes.map((j) => (x.nf ? ' · ' : '') + 'Ajuste ' + esc(j.nombre) + ' ' + L.fmtAR(j.monto)).join('')}</small></span><b>${L.fmtAR(x.total)}</b></div>`).join('');
     return subHeader('Retiros') + `<div class="body">
 <div class="datebar" style="background:#1B6468;margin:0"><button data-a="rmes" data-v="-1" aria-label="Mes anterior">‹</button><span class="d">${esc(mes.charAt(0).toUpperCase() + mes.slice(1))}</span><button data-a="rmes" data-v="1" aria-label="Mes siguiente">›</button></div>
 <div class="card res" style="padding:16px"><div style="font-size:13px;color:#55625F">TOTAL RETIRADO EN EL MES</div><div style="font-size:30px;font-weight:800;margin:4px 0">$${L.fmtAR(r.total)}</div><div style="font-size:12px;color:#55625F">Suma el retiro no facturado del Arqueo y los ajustes de ROKE y NICOLAS. Cada mes empieza de cero.</div></div>
@@ -1161,13 +1373,13 @@ ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</b
 
   // ---------- Limpiar historial viejo ----------
   function viewArchivar() {
-    const corte = S.corte || shiftDay(today(), -90), r = L.resumenCorte(DB, corte);
-    const ult = Object.keys(DB.allTxns).sort().pop() || today();
-    const ok = r.borrar > 0 && corte <= ult;
+    const ult = Object.keys(DB.allTxns).sort().pop() || today(), maxC = shiftDay(ult, -7);
+    const corte = S.corte || maxC, r = L.resumenCorte(DB, corte);
+    const ok = r.borrar > 0 && corte <= maxC;
     const base = DB.baseSemana && DB.baseSemana.desde ? `<p>Ya hay una limpieza anterior: los datos arrancan desde el <b>${esc(fechaCorta(DB.baseSemana.desde))}</b>.</p>` : '';
     return subHeader('Limpiar historial') + `<div class="body">
-<section class="card sec"><h2>Paso 1: elegí el día</h2><p>Se borra todo lo que sea <b>anterior</b> a este día. Ese día y los siguientes quedan.</p>
-<label class="f">Borrar lo anterior al<input type="date" id="arc-corte" value="${esc(corte)}" max="${esc(ult)}" style="text-align:left"></label>${base}</section>
+<section class="card sec"><h2>Paso 1: elegí el día</h2><p>Se borra todo lo que sea <b>anterior</b> a este día. Ese día y los siguientes quedan. Siempre queda al menos una semana de historial.</p>
+<label class="f">Borrar lo anterior al<input type="date" id="arc-corte" value="${esc(corte)}" max="${esc(maxC)}" style="text-align:left"></label>${base}</section>
 <section class="card sec"><h2>Qué va a pasar</h2>
 ${ok ? `<p style="font-size:15px;color:#1B2B2A">Se borran <b>${r.borrar} ${r.borrar === 1 ? 'día' : 'días'}</b> (del ${esc(fechaCorta(r.desde))} al ${esc(fechaCorta(r.hasta))}). Quedan <b>${r.quedan} ${r.quedan === 1 ? 'día' : 'días'}</b>.</p>
 <p>Antes de borrar, la app guarda como punto de partida una foto de todo:</p>
@@ -1190,9 +1402,9 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
   }
 
   // ---------- PIN de titular, Limpiar, Deshacer ----------
-  function requirePin(next) {
-    if (Date.now() < S.titularUntil) return next();
-    const ok = () => { S.titularUntil = Date.now() + 5 * 60 * 1000; return null; };
+  function requirePin(next, siempre) {
+    if (!siempre && Date.now() < S.titularUntil) return next();
+    const ok = () => { if (!siempre) S.titularUntil = Date.now() + 5 * 60 * 1000; return null; };
     if (!DB.config.titularHash) {
       S.modal = { title: 'PIN de titular', text: 'Primera vez: elegí un PIN de 4 números solo para el titular. Protege Limpiar, Clientes y Respaldo.', ok: 'GUARDAR', pin: 2,
         onPin: async (p) => { DB.config.titularHash = await hashPin('T' + p); persist(); return ok(); }, after: next };
@@ -1282,6 +1494,17 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject()).then((t) => { S.pegar.texto = t; render(); }, () => toast('No se pudo leer. Mantené apretado en el cuadro y elegí Pegar.', 4000));
     }
     else if (a === 'pg-leer') pgLeer();
+    else if (a === 'pg-foto') { const f = document.getElementById('pg-foto'); if (f) { f.value = ''; f.click(); } }
+    else if (a === 'pg-fotoborrar') { S.pegar.fotos = []; render(); }
+    else if (a === 'pg-leerfotos') pgLeerFotos();
+    else if (a === 'lc-guardar') lcGuardar();
+    else if (a === 'lc-pegar') { (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject()).then((t) => { const e = document.getElementById('lc-cod'); if (e) e.value = t.trim(); }, () => toast('No se pudo leer. Mantené apretado en el cuadro y elegí Pegar.', 4000)); }
+    else if (a === 'lc-copiar') requirePin(() => { const c = lectorCfg(); (navigator.clipboard ? navigator.clipboard.writeText(c.url + '|' + c.clave) : Promise.reject()).then(() => toast('Código copiado. Mandáselo a tu empleado por WhatsApp.', 4500), () => toast('No se pudo copiar.', 3000)); });
+    else if (a === 'lc-quitar') requirePin(() => { delete DB.config.lector; persist(); toast('Lector quitado.', 3000); render(); });
+    else if (a === 'lc-probar') {
+      toast('Probando…', 2000);
+      llamarLector([], 'Respondé solo con la palabra OK.').then((t) => toast('Conexión correcta ✓ (' + String(t).slice(0, 20) + ')', 4500), (e) => toast(e.message, 6000));
+    }
     else if (a === 'pg-atras') { S.pegar.paso = 'texto'; render(); }
     else if (a === 'pg-aplicar') pgAplicar();
     else if (a === 'solo') { S.solo = !S.solo; render(); }
@@ -1295,6 +1518,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       S.open = null; if (persist()) { toast('Día guardado y bloqueado'); render(); preguntarRespaldo(); }
     }
     else if (a === 'respaldo') hacerRespaldo();
+    else if (a === 'resp-ya') respaldoRapido();
     else if (a === 'restaurar') { const f = document.getElementById('file'); if (f) { f.value = ''; f.click(); } }
     else if (a === 'm-no') { S.modal = null; render(); }
     else if (a === 'm-ok') okModal();
@@ -1304,12 +1528,33 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       else if (v === 'historial') { S.sub = 'historial'; S.selCli = null; S.hq = ''; render(); }
       else if (v === 'clientes') requirePin(() => { S.sub = 'clientes'; S.hq = ''; render(); });
       else if (v === 'notas') { S.sub = 'notas'; render(); }
-      else if (v === 'resumen') { S.sub = 'resumen'; S.rdia = S.fecha; render(); }
-      else if (v === 'retiros') requirePin(() => { S.sub = 'retiros'; S.rmes = today().slice(0, 7); render(); });
+      else if (v === 'resumen') requirePin(() => { S.sub = 'resumen'; S.rdia = S.fecha; render(); });
+      else if (v === 'retiros') requirePin(() => { S.sub = 'retiros'; S.rmes = today().slice(0, 7); render(); }, true);
       else if (v === 'pasar') { S.sub = 'pasar'; render(); }
-      else if (v === 'archivar') requirePin(() => { S.sub = 'archivar'; S.arcOk = false; S.corte = shiftDay(today(), -90); render(); });
+      else if (v === 'archivar') requirePin(() => { S.sub = 'archivar'; S.arcOk = false; S.corte = null; render(); });
+      else if (v === 'lector') { S.pegar = null; S.sub = 'lector'; render(); }
       else if (v === 'respaldo') requirePin(() => { S.sub = 'respaldo'; render(); });
     }
+    else if (a === 'cm-abrir') { S.cmas = { paso: 'texto', texto: '' }; S.sub = 'cmasivo'; render(); }
+    else if (a === 'cm-planilla') entregar('clientes-contactos.csv', new Blob([L.csvContactos(DB)], { type: 'text/csv' }), 'Planilla guardada en Descargas.');
+    else if (a === 'cm-pegar') {
+      (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject()).then((t) => { S.cmas.texto = t; render(); }, () => toast('No se pudo leer. Mantené apretado en el cuadro y elegí Pegar.', 4000));
+    }
+    else if (a === 'cm-leer') {
+      const e = document.getElementById('cm-txt'); if (e) S.cmas.texto = e.value;
+      const lista = L.armarContactos(DB, S.cmas.texto);
+      if (!lista.filas.length) return toast('No encontré teléfonos ni mails. Revisá el texto pegado.', 4000);
+      S.cmas.lista = lista; S.cmas.paso = 'revisar'; render();
+    }
+    else if (a === 'cm-atras') { S.cmas.paso = 'texto'; render(); }
+    else if (a === 'cm-aplicar') {
+      const Ls = S.cmas.lista, r = cmResumen(Ls); if (r.sin) return toast('Faltan clientes por identificar.', 3000);
+      S.modal = { title: '¿Actualizar clientes?', ok: 'OK, ACTUALIZAR', cancel: 'ATRÁS',
+        text: `Se actualizan <b>${r.n} clientes</b>: ${r.tel} teléfonos y ${r.mail} mails. Lo que ya tenían cargado y no viene en la lista no se borra.`,
+        onOk: () => { const c = L.aplicarContactos(DB, Ls); if (persist()) toast('Listo: ' + c.tel + ' teléfonos y ' + c.mail + ' mails cargados.', 4500); S.cmas = null; S.sub = 'clientes'; } };
+      render();
+    }
+    else if (a === 'subback' && S.sub === 'cmasivo') { if (S.cmas && S.cmas.paso === 'revisar') S.cmas.paso = 'texto'; else { S.cmas = null; S.sub = 'clientes'; } render(); }
     else if (a === 'subback' && S.pegar) { if (S.pegar.paso === 'revisar') S.pegar.paso = 'texto'; else S.pegar = null; render(); }
     else if (a === 'subback') { if (S.sub === 'cform') { S.sub = 'clientes'; S.edit = null; } else if (S.sub === 'historial' && S.selCli) S.selCli = null; else S.sub = null; render(); }
     else if (a === 'hsel') { S.selCli = v; render(); }
@@ -1359,8 +1604,21 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
         onOk: () => { x.id = val; x.estado = 'manual'; } };
       render(); return;
     }
+    if (t.dataset && t.dataset.cmsel != null && S.cmas) {
+      const x = S.cmas.lista.filas[Number(t.dataset.cmsel)], val = t.value;
+      if (!val) { render(); return; }
+      if (val === '__omitir') { x.estado = 'omitir'; render(); return; }
+      const cl = DB.clients.find((c) => c.id === val);
+      S.modal = { title: 'Eligió a ' + cl.name, ok: 'OK', cancel: 'ATRÁS', text: `La línea <b>${esc(x.nombre)}</b> se carga a <b>${esc(cl.name)}</b>.`, onOk: () => { x.id = val; x.estado = 'manual'; } };
+      render(); return;
+    }
+    if (t.dataset && t.dataset.pgm != null && S.pegar && S.pegar.lista) {
+      const n = L.parseAR(t.value); if (isNaN(n) || t.value.trim() === '') { toast('Monto no válido.', 2500); render(); return; }
+      S.pegar.lista.filas[Number(t.dataset.pgm)].monto = n; render(); return;
+    }
     if (t.id === 'pg-exp' && S.pegar) { const n = L.parseAR(t.value); S.pegar.totalEsperado = isNaN(n) || t.value.trim() === '' ? null : n; render(); return; }
     if (t.id === 'file' && t.files && t.files[0]) return leerArchivo(t.files[0]);
+    if (t.id === 'pg-foto' && t.files && t.files.length && S.pegar) return pgFotoAgregar(t.files);
     if (t.dataset && t.dataset.opt) { S[t.dataset.opt] = t.checked; return; }
     if (t.id === 'file-c' && t.files && t.files[0]) return leerCierre(t.files[0]);
     if (t.id === 'file-s' && t.files && t.files[0]) return leerSaldos(t.files[0]);
@@ -1398,7 +1656,6 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
   render();
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
-
 </script>
 </body>
 </html>
