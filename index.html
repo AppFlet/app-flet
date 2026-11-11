@@ -17,7 +17,7 @@ button,input{font:inherit}
 .chip{background:#1B6468;border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700;border:0;color:#fff}
 .datebar{display:flex;align-items:center;justify-content:space-between;background:#1B6468;border-radius:12px;padding:4px}
 .datebar button{width:48px;height:44px;border:0;background:transparent;color:#fff;font-size:24px}
-.datebar .d{font-size:17px;font-weight:700}
+.datebar .d{font-size:17px;font-weight:700;color:#fff}
 .body{flex:1;overflow-y:auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
 .search{display:flex;gap:8px;padding:10px 12px 4px;flex:none}
 .search input{flex:1;height:46px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:16px;background:#fff;min-width:0}
@@ -93,6 +93,14 @@ button,input{font:inherit}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .pg{border-left:6px solid #C9D3D0}.pg.verde{border-left-color:#1E7A46}.pg.amar{border-left-color:#B7791F;background:#FFF8E8}.pg.rojo{border-left-color:#B3261E;background:#FDECEA}.pg.om{opacity:.6}
 .pg .pgh{display:flex;justify-content:space-between;gap:10px}.pg small{display:block;color:#55625F;margin:2px 0}.pg select{width:100%;height:44px;margin-top:6px;border-radius:10px;border:1px solid #C9D3D0;padding:0 8px;background:#fff;font-size:15px}
+
+.rk{display:flex;align-items:center;gap:10px;border-left:6px solid #C9D3D0}.rk.verde{border-left-color:#1E7A46;background:#E6F4EA}.rk.amarillo{border-left-color:#C9A100;background:#FFF9D6}.rk.naranja{border-left-color:#E07B00;background:#FFEBD5}.rk.rojo{border-left-color:#B3261E;background:#FDECEA}.rkp{font-weight:800;font-size:18px;min-width:30px;text-align:center}.rkn{flex:1;display:flex;flex-direction:column}.rk-leyenda{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.rk-leyenda .rk{padding:3px 8px;border-radius:8px;font-size:13px;border-left-width:4px}
+
+.datebar .dbtn{flex:1;background:transparent;border:0;color:#fff;font-size:17px;font-weight:700;height:44px}
+.box.cal{gap:10px}.calh{display:flex;align-items:center;justify-content:space-between;font-size:18px}.calh .chip{background:#E6EEEC;color:#1B2B2A;width:44px;height:40px;font-size:22px;padding:0}
+.calg{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.calw span{text-align:center;font-size:13px;color:#55625F;font-weight:700}.calw .dom,.calg .dom b{color:#B3261E}
+.cd{position:relative;height:42px;border:1px solid transparent;border-radius:10px;background:#F4F7F6;font-size:16px;padding:0}.cd.dom{background:#FBECEA}.cd.hoy{border-color:#1B6468;border-width:2px}.cd.sel{background:#1B6468}.cd.sel b{color:#fff}
+.cd i,.calley i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1E7A46}.cd i{position:absolute;bottom:4px;left:50%;margin-left:-3px}.cd.sel i{background:#fff}.calley{margin:0;font-size:13px;color:#55625F}
 </style>
 </head>
 <body>
@@ -539,7 +547,47 @@ button,input{font:inherit}
     return '﻿' + ['Cliente;Teléfono;Mail'].concat(orden.map((c) => [q(c.name), q(c.telefono || ''), q(c.email || '')].join(';'))).join('\r\n');
   }
 
-  const api = { r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes, diaAnterior, detalleArqueo, leerLista, avisoRepetida, esDescartado, leerContactos, armarContactos, aplicarContactos, csvContactos, buscarCliente, armarLista, aplicarLista, normNom };
+  // ---- Ranking de clientes por compras y comparativa entre meses ----
+  function comprasMes(db, ym, hasta) {
+    const por = {}, dias = {};
+    Object.keys(db.allTxns || {}).filter((d) => d.slice(0, 7) === ym && (!hasta || d <= hasta)).forEach((d) => {
+      Object.keys(db.allTxns[d]).forEach((id) => {
+        if (id === '__meta__') return;
+        const v = (db.allTxns[d][id] || {}).compra || 0; if (!v) return;
+        por[id] = r2((por[id] || 0) + v); dias[id] = (dias[id] || 0) + 1;
+      });
+    });
+    return { por, dias };
+  }
+  function rankingMes(db, ym, hasta) {
+    const m = comprasMes(db, ym, hasta), por = m.por, dias = m.dias;
+    const filas = db.clients.filter((c) => por[c.id]).map((c) => ({ id: c.id, name: c.name, compra: por[c.id], dias: dias[c.id] }))
+      .sort((x, y) => y.compra - x.compra || String(x.name).localeCompare(String(y.name), 'es'));
+    filas.forEach((f, i) => { f.pos = i + 1; f.color = f.pos <= 10 ? 'verde' : f.pos <= 20 ? 'amarillo' : f.pos <= 30 ? 'naranja' : 'rojo'; });
+    const desde = db.baseSemana && db.baseSemana.desde ? db.baseSemana.desde : '';
+    const hayDatos = Object.keys(db.allTxns || {}).some((d) => d.slice(0, 7) === ym);
+    return { filas, total: r2(filas.reduce((s, f) => s + f.compra, 0)), sinCompras: db.clients.length - filas.length, incompleto: !!desde && desde > ym + '-01', hayDatos, desde };
+  }
+  const mesMas = (ym, n) => { const p = ym.split('-').map(Number); const d = new Date(p[0], p[1] - 1 + n, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+  function compararMeses(db, id, ymA, ymB) {
+    const una = (ym) => { const r = rankingMes(db, ym), f = r.filas.find((x) => x.id === id); return { ym, compra: f ? f.compra : 0, dias: f ? f.dias : 0, pos: f ? f.pos : null, de: r.filas.length, incompleto: r.incompleto, hayDatos: r.hayDatos }; };
+    const A = una(ymA), B = una(ymB), dif = r2(A.compra - B.compra);
+    return { A, B, dif, pct: B.compra ? r2((dif / Math.abs(B.compra)) * 100) : null };
+  }
+
+  // ---- Aviso de limpieza: cuando hay más de 15 meses guardados, propone borrar los 3 más antiguos ----
+  function avisoLimpieza(db, hoy, maxMeses) {
+    const tope = maxMeses || 15;
+    const fechas = Object.keys(db.allTxns || {}).concat(Object.keys(db.arqueo || {}), Object.keys(db.logisticaTxns || {})).sort();
+    if (!fechas.length) return { hay: false, meses: 0 };
+    const p = fechas[0].slice(0, 7).split('-').map(Number), q = hoy.slice(0, 7).split('-').map(Number);
+    const meses = (q[0] - p[0]) * 12 + (q[1] - p[1]) + 1;
+    if (meses <= tope) return { hay: false, meses };
+    const primero = fechas[0].slice(0, 7), corte = mesMas(primero, 3) + '-01';
+    return { hay: true, meses, desde: primero, corte };
+  }
+
+  const api = { avisoLimpieza, rankingMes, compararMeses, mesMas, r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, retirosMes, diaAnterior, detalleArqueo, leerLista, avisoRepetida, esDescartado, leerContactos, armarContactos, aplicarContactos, csvContactos, buscarCliente, armarLista, aplicarLista, normNom };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.R284 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -602,7 +650,7 @@ button,input{font:inherit}
 <script>'use strict';
 (function () {
   const root = window;
-  const VERSION = 18;
+  const VERSION = 21;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -706,7 +754,7 @@ button,input{font:inherit}
     let lab = dateObj(S.fecha).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
     lab = lab.charAt(0).toUpperCase() + lab.slice(1);
     return `<header class="hdr"><div class="row"><h1>${titulo}</h1><button class="chip" data-a="lock" aria-label="Bloquear la app (${esc(S.name)})">${esc(S.name)} · Bloquear</button></div>` +
-      (conFecha ? `<div class="datebar"><button data-a="dia" data-v="-1" aria-label="Día anterior">‹</button><div class="d">${esc(lab)}</div><button data-a="dia" data-v="1" aria-label="Día siguiente">›</button></div>` : '') + '</header>';
+      (conFecha ? `<div class="datebar"><button data-a="dia" data-v="-1" aria-label="Día anterior">‹</button><button class="d dbtn" data-a="cal-abrir" aria-label="Elegir fecha en el calendario">${esc(lab)} ▾</button><button data-a="dia" data-v="1" aria-label="Día siguiente">›</button></div>` : '') + '</header>';
   }
 
   function viewLogin() {
@@ -780,7 +828,7 @@ button,input{font:inherit}
     const dom = dateObj(S.fecha).getDay() === 0;
     return header('Cierre del día', true) +
       (dom ? '<div style="padding:8px 12px 0"><div class="banner">Es domingo: normalmente no se trabaja. Podés cargar igual si hace falta.</div></div>' : '') +
-      respaldoBanner() +
+      respaldoBanner() + limpiezaBanner() +
       (diaBloqueado(S.fecha) ? lockBanner() : '') +
       `<div class="search"><input id="q" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="btn sm ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">Con saldo</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Todos abiertos' : 'Abrir todos'}</button><button class="btn sm ghost" data-a="pg-abrir" style="flex-basis:100%">📋 Pegar lista (foto leída por Claude)</button></div>` +
       `<div class="body" id="list">${listHTML()}</div><div class="foot" id="foot">${footHTML()}</div>` + nav();
@@ -945,12 +993,51 @@ ${filas || '<div class="empty">No se encontró ningún renglón con un monto.</d
   const fechaCorta = (f) => f.slice(8, 10) + '/' + f.slice(5, 7);
   const subHeader = (t, extra) => `<header class="hdr"><div class="row"><button class="chip" data-a="subback" aria-label="Volver">‹ Volver</button><h1 style="font-size:20px">${t}</h1>${extra || '<span style="width:76px"></span>'}</div></header>`;
 
+  // ---------- Ranking de clientes y comparativa de meses ----------
+  const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const mesNombre = (ym) => MESES[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4);
+  function viewRanking() {
+    const hoy = today(), actual = hoy.slice(0, 7), ym = S.rk || actual, enCurso = ym === actual;
+    const r = L.rankingMes(DB, ym, enCurso ? hoy : null);
+    const nota = enCurso ? `Del 1/${ym.slice(5, 7)} al ${fechaCorta(hoy)} · mes en curso (se cierra el último día del mes)` : 'Mes cerrado · ranking final';
+    const aviso = r.incompleto ? `<div class="banner"><b>Faltan datos:</b> el historial se limpió y los datos arrancan desde el ${esc(r.desde.slice(8, 10) + '/' + r.desde.slice(5, 7) + '/' + r.desde.slice(0, 4))}. Este ranking está incompleto.</div>` : (!r.hayDatos ? '<div class="banner">No hay días cargados en este mes.</div>' : '');
+    const filas = r.filas.map((f) => `<div class="card rk ${f.color}"><span class="rkp">${f.pos}</span><span class="rkn"><b>${esc(f.name)}</b><small>${f.dias} ${f.dias === 1 ? 'día' : 'días'} con compra</small></span><b>${L.fmtAR(f.compra)}</b></div>`).join('');
+    return subHeader('Ranking de clientes') + `<div class="body">
+<div class="datebar" style="margin:0"><button data-a="rk-prev" aria-label="Mes anterior">‹</button><span class="d">${mesNombre(ym)}</span><button data-a="rk-next" aria-label="Mes siguiente"${enCurso ? ' disabled style="opacity:.3"' : ''}>›</button></div>
+<section class="card res"><div class="rline"><span>${nota}</span></div><div class="rline"><span>Compras del mes</span><b>${L.fmtAR(r.total)}</b></div><div class="rline"><span>Clientes con compras</span><b>${r.filas.length}</b></div>
+<div class="rk-leyenda"><span class="rk verde">1-10</span><span class="rk amarillo">11-20</span><span class="rk naranja">21-30</span><span class="rk rojo">31 en adelante</span></div></section>
+${aviso}${filas || '<div class="empty">Todavía no hay compras en este mes.</div>'}
+${r.sinCompras > 0 && r.filas.length ? `<div class="empty" style="padding:10px">${r.sinCompras} clientes sin compras en el mes.</div>` : ''}</div>` + nav();
+  }
+  function viewComparar() {
+    const actual = today().slice(0, 7), cerrado = L.mesMas(actual, -1);
+    const P = S.cmp || (S.cmp = { id: '', a: cerrado, b: L.mesMas(cerrado, -1) });
+    const meses = []; for (let i = 1; i <= 14; i++) meses.push(L.mesMas(actual, -i));
+    const mopts = (sel) => meses.map((m) => `<option value="${m}"${m === sel ? ' selected' : ''}>${mesNombre(m)}</option>`).join('');
+    const clientes = DB.clients.slice().sort((x, y) => String(x.name).localeCompare(String(y.name), 'es'));
+    let res = '<div class="empty">Elegí un cliente.</div>';
+    if (P.id) {
+      const c = L.compararMeses(DB, P.id, P.a, P.b), sube = c.dif > 0, cl = clientes.find((x) => x.id === P.id);
+      const col = (m) => `<div class="card" style="flex:1;text-align:center"><div style="font-size:13px;color:#55625F">${mesNombre(m.ym)}</div><div style="font-size:20px;font-weight:800;margin:4px 0">${L.fmtAR(m.compra)}</div><small>${m.dias} ${m.dias === 1 ? 'día' : 'días'} con compra${m.pos ? '<br>Puesto ' + m.pos + ' de ' + m.de : ''}</small></div>`;
+      const falta = (c.A.incompleto || c.B.incompleto) ? '<div class="banner"><b>Ojo:</b> uno de los meses puede estar incompleto porque se limpió el historial.</div>' : (!c.A.hayDatos || !c.B.hayDatos) ? '<div class="banner">Uno de los meses no tiene días cargados.</div>' : '';
+      res = `<div style="display:flex;gap:8px">${col(c.A)}${col(c.B)}</div>${falta}
+<section class="card res"><div class="rline big"><span>${esc(cl ? cl.name : '')}</span></div>
+<div class="rline"><span>Diferencia (${mesNombre(c.A.ym)} contra ${mesNombre(c.B.ym)})</span><b style="color:${c.dif === 0 ? '#1B2B2A' : sube ? '#1E7A46' : '#B3261E'}">${sube ? '+' : ''}${L.fmtAR(c.dif)}</b></div>
+${c.pct != null ? `<div class="rline"><span>Variación</span><b style="color:${c.dif === 0 ? '#1B2B2A' : sube ? '#1E7A46' : '#B3261E'}">${sube ? '+' : ''}${L.fmtAR(c.pct)} %</b></div>` : '<div class="rline"><span>Variación</span><b>—</b></div>'}</section>`;
+    }
+    return subHeader('Comparar meses') + `<div class="body">
+<section class="card sec"><label class="f">Cliente<select id="cmp-cli"><option value="">— elegir cliente —</option>${clientes.map((c) => `<option value="${esc(c.id)}"${c.id === P.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+<div class="grid2"><label class="f">Mes<select id="cmp-a">${mopts(P.a)}</select></label><label class="f">Contra<select id="cmp-b">${mopts(P.b)}</select></label></div>
+<p style="margin:6px 0 0"><small>Solo meses cerrados. Compara las compras del cliente de un mes contra otro.</small></p></section>${res}</div>` + nav();
+  }
   function viewMasRouter() {
     switch (S.sub) {
       case 'historial': return viewHistorial();
       case 'clientes': return viewClientes();
       case 'cform': return viewCForm();
       case 'cmasivo': return viewCMasivo();
+      case 'ranking': return viewRanking();
+      case 'comparar': return viewComparar();
       case 'lector': return viewLector();
       case 'notas': return viewNotas();
       case 'respaldo': return viewRespaldo();
@@ -964,14 +1051,15 @@ ${filas || '<div class="empty">No se encontró ningún renglón con un monto.</d
 
   function viewMas() {
     const dias = Object.keys(DB.allTxns).length;
-    const sab = new Date().getDay() === 6;
     const row = (v, t, sub, lock) => `<button class="mrow" data-a="menu" data-v="${v}"><span><b>${t}</b><small>${sub}</small></span>${lock ? LOCK : '<span aria-hidden="true">›</span>'}</button>`;
     return header('Más', false) + `<div class="body">
-${sab ? '<div class="banner"><b>Es sábado:</b> hacé el respaldo y guardalo en tu Drive.</div>' : ''}
+${limpiezaBanner()}
 ${row('limpiar', 'Limpiar (Cierre diario)', 'Borra compras y pagos de ' + esc(fechaLarga(S.fecha)), true)}
 ${DB.undo ? `<button class="mrow" data-a="menu" data-v="undo" style="border-color:#E8B65A;background:#FFF8E8"><span><b>Deshacer la última limpieza</b><small>Día ${esc(fechaLarga(DB.undo.fecha))}</small></span><span aria-hidden="true">↶</span></button>` : ''}
 ${row('resumen', 'Resumen del día', 'Cierre, arqueo y logística en un texto para compartir', true)}
 ${row('retiros', 'Retiros del mes', 'Retiro y ajustes de ROKE y NICOLAS', true)}
+${row('ranking', 'Ranking de clientes', 'Quién compra más en el mes (verde, amarillo, naranja, rojo)', true)}
+${row('comparar', 'Comparar meses', 'Compras de un cliente: un mes contra otro', true)}
 ${row('historial', 'Historial', 'Movimientos y saldo de cada cliente', false)}
 ${row('clientes', 'Clientes', 'Altas, bajas, mail, teléfono y saldo inicial', true)}
 ${row('notas', 'Bitácora', 'Notas del día', false)}
@@ -1089,6 +1177,22 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
 <div class="foot" style="align-items:flex-end"><label class="f" style="flex:1">Nueva nota<input id="n-text" type="text" style="text-align:left" placeholder="Escribí acá…" autocomplete="off"></label><button class="btn green" data-a="nsave">GUARDAR</button></div>` + nav();
   }
 
+  // ---------- Calendario desplegable ----------
+  function calHTML() {
+    if (!S.cal || !S.logged) return '';
+    const ym = S.cal.ym, hoy = today(), p = ym.split('-').map(Number);
+    const primero = new Date(p[0], p[1] - 1, 1), nDias = new Date(p[0], p[1], 0).getDate();
+    const lead = (primero.getDay() + 6) % 7; // semana desde el lunes
+    const conDatos = (f) => { const d = DB.allTxns[f]; return !!d && Object.keys(d).some((k) => k !== '__meta__'); };
+    let celdas = ''; for (let i = 0; i < lead; i++) celdas += '<span></span>';
+    for (let n = 1; n <= nDias; n++) {
+      const f = ym + '-' + String(n).padStart(2, '0'), dom = new Date(p[0], p[1] - 1, n).getDay() === 0;
+      celdas += `<button class="cd${f === S.fecha ? ' sel' : ''}${f === hoy ? ' hoy' : ''}${dom ? ' dom' : ''}" data-a="cal-dia" data-v="${f}" aria-label="${n} de ${MESES[p[1] - 1]}"><b>${n}</b>${conDatos(f) ? '<i></i>' : ''}</button>`;
+    }
+    return `<div class="modal" role="dialog" aria-modal="true" aria-label="Calendario"><div class="box cal"><div class="calh"><button class="chip" data-a="cal-mes" data-v="-1" aria-label="Mes anterior">‹</button><b>${mesNombre(ym)}</b><button class="chip" data-a="cal-mes" data-v="1" aria-label="Mes siguiente">›</button></div>
+<div class="calg calw"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span class="dom">D</span></div><div class="calg">${celdas}</div>
+<p class="calley"><i></i> día con datos cargados</p><div class="btns"><button class="btn ghost" data-a="cal-cerrar">CERRAR</button><button class="btn green" data-a="cal-hoy">IR A HOY</button></div></div></div>`;
+  }
   function modalHTML() {
     if (!S.modal) return '';
     const m = S.modal;
@@ -1103,7 +1207,7 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     else if (S.tab === 'arqueo') h = viewArqueo();
     else if (S.tab === 'logistica') h = viewLogistica();
     else h = viewMasRouter();
-    app.innerHTML = h + modalHTML();
+    app.innerHTML = h + modalHTML() + calHTML();
     showToast();
     const mp = document.getElementById('mpin'); if (mp) mp.focus();
   }
@@ -1154,6 +1258,10 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     if (r && ymd(new Date(r)) === today()) return null;
     if (r && c.cambio <= r) return null;
     return r;
+  }
+  function limpiezaBanner() {
+    const av = L.avisoLimpieza(DB, today()); if (!av.hay) return '';
+    return `<div style="padding:8px 12px 0"><div class="banner" style="background:#FFF3E0;border-color:#E07B00"><b>🧹 Es momento de limpiar el historial.</b> Hay ${av.meses} meses guardados. Se propone borrar los 3 más antiguos (${esc(mesNombre(av.desde))} y los 2 siguientes). Antes se hace un respaldo.<br><button class="btn sm" data-a="limp-ir" style="margin-top:8px;width:100%">LIMPIAR AHORA (PIN de titular)</button></div></div>`;
   }
   function respaldoBanner() {
     const r = respaldoPendiente(); if (r === null) return '';
@@ -1378,7 +1486,7 @@ ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</b
     const ok = r.borrar > 0 && corte <= maxC;
     const base = DB.baseSemana && DB.baseSemana.desde ? `<p>Ya hay una limpieza anterior: los datos arrancan desde el <b>${esc(fechaCorta(DB.baseSemana.desde))}</b>.</p>` : '';
     return subHeader('Limpiar historial') + `<div class="body">
-<section class="card sec"><h2>Paso 1: elegí el día</h2><p>Se borra todo lo que sea <b>anterior</b> a este día. Ese día y los siguientes quedan. Siempre queda al menos una semana de historial.</p>
+<section class="card sec"><h2>Paso 1: elegí el día</h2><p>Se borra todo lo que sea <b>anterior</b> a este día. Ese día y los siguientes quedan. Siempre queda al menos una semana de historial.</p><p><b>Ojo:</b> al limpiar se pierde el detalle de los meses borrados, y el Ranking y Comparar meses solo pueden mostrar meses que sigan guardados. La app te avisa sola cuando pasan de 15 meses y propone borrar los 3 más antiguos.</p>
 <label class="f">Borrar lo anterior al<input type="date" id="arc-corte" value="${esc(corte)}" max="${esc(maxC)}" style="text-align:left"></label>${base}</section>
 <section class="card sec"><h2>Qué va a pasar</h2>
 ${ok ? `<p style="font-size:15px;color:#1B2B2A">Se borran <b>${r.borrar} ${r.borrar === 1 ? 'día' : 'días'}</b> (del ${esc(fechaCorta(r.desde))} al ${esc(fechaCorta(r.hasta))}). Quedan <b>${r.quedan} ${r.quedan === 1 ? 'día' : 'días'}</b>.</p>
@@ -1480,6 +1588,11 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'back') { S.buf = S.buf.slice(0, -1); render(); }
     else if (a === 'lock') { S.logged = false; S.titularUntil = 0; S.buf = ''; S.stage = 'entrar'; S.msg = ''; render(); }
     else if (a === 'tab') { S.tab = v; S.sub = null; S.pegar = null; S.selCli = null; render(); }
+    else if (a === 'cal-abrir') { S.cal = { ym: S.fecha.slice(0, 7) }; render(); }
+    else if (a === 'cal-cerrar') { S.cal = null; render(); }
+    else if (a === 'cal-mes') { S.cal.ym = L.mesMas(S.cal.ym, Number(v)); render(); }
+    else if (a === 'cal-dia') { S.fecha = v; S.open = null; S.cal = null; render(); }
+    else if (a === 'cal-hoy') { S.fecha = today(); S.open = null; S.cal = null; render(); }
     else if (a === 'dia') { S.fecha = shiftDay(S.fecha, Number(v)); S.open = null; render(); }
     else if (a === 'destrabar') requirePin(confirmDestrabar);
     else if (a === 'adestr') requirePin(() => confirmDestrabarRec('arqueo'));
@@ -1493,6 +1606,8 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'pg-pegar') {
       (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject()).then((t) => { S.pegar.texto = t; render(); }, () => toast('No se pudo leer. Mantené apretado en el cuadro y elegí Pegar.', 4000));
     }
+    else if (a === 'rk-prev') { S.rk = L.mesMas(S.rk || today().slice(0, 7), -1); render(); }
+    else if (a === 'rk-next') { const m = L.mesMas(S.rk || today().slice(0, 7), 1); S.rk = m >= today().slice(0, 7) ? null : m; render(); }
     else if (a === 'pg-leer') pgLeer();
     else if (a === 'pg-foto') { const f = document.getElementById('pg-foto'); if (f) { f.value = ''; f.click(); } }
     else if (a === 'pg-fotoborrar') { S.pegar.fotos = []; render(); }
@@ -1519,12 +1634,15 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     }
     else if (a === 'respaldo') hacerRespaldo();
     else if (a === 'resp-ya') respaldoRapido();
+    else if (a === 'limp-ir') requirePin(() => { const av = L.avisoLimpieza(DB, today()); S.tab = 'mas'; S.sub = 'archivar'; S.arcOk = false; S.corte = av.hay ? av.corte : null; render(); });
     else if (a === 'restaurar') { const f = document.getElementById('file'); if (f) { f.value = ''; f.click(); } }
     else if (a === 'm-no') { S.modal = null; render(); }
     else if (a === 'm-ok') okModal();
     else if (a === 'menu') {
       if (v === 'limpiar') requirePin(confirmLimpiar);
       else if (v === 'undo') confirmUndo();
+      else if (v === 'ranking') requirePin(() => { S.rk = null; S.sub = 'ranking'; render(); });
+      else if (v === 'comparar') requirePin(() => { S.cmp = null; S.sub = 'comparar'; render(); });
       else if (v === 'historial') { S.sub = 'historial'; S.selCli = null; S.hq = ''; render(); }
       else if (v === 'clientes') requirePin(() => { S.sub = 'clientes'; S.hq = ''; render(); });
       else if (v === 'notas') { S.sub = 'notas'; render(); }
@@ -1616,6 +1734,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       const n = L.parseAR(t.value); if (isNaN(n) || t.value.trim() === '') { toast('Monto no válido.', 2500); render(); return; }
       S.pegar.lista.filas[Number(t.dataset.pgm)].monto = n; render(); return;
     }
+    if (t.id === 'cmp-cli' || t.id === 'cmp-a' || t.id === 'cmp-b') { const P = S.cmp || (S.cmp = {}); if (t.id === 'cmp-cli') P.id = t.value; else if (t.id === 'cmp-a') P.a = t.value; else P.b = t.value; render(); return; }
     if (t.id === 'pg-exp' && S.pegar) { const n = L.parseAR(t.value); S.pegar.totalEsperado = isNaN(n) || t.value.trim() === '' ? null : n; render(); return; }
     if (t.id === 'file' && t.files && t.files[0]) return leerArchivo(t.files[0]);
     if (t.id === 'pg-foto' && t.files && t.files.length && S.pegar) return pgFotoAgregar(t.files);
