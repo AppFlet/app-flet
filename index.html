@@ -169,6 +169,10 @@ html,body{overscroll-behavior-y:none}
 
 .lic-rejilla{position:absolute;left:8%;right:8%;top:10%;bottom:10%;background:repeating-linear-gradient(#5B6668 0 2px,#E9EEF0 2px 6px);border-radius:3px}
 .lic-ventilador{position:absolute;left:50%;top:50%;width:46%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,#2A3234 0 14%,#8A9496 16% 60%,#2A3234 62%)}
+
+.btnrow{display:flex;gap:6px;padding:10px 12px 0;flex:none}.btnrow .btn{flex:1 1 0;min-width:0;height:42px;padding:0 4px;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zona .ztit{font-size:22px;font-weight:900;letter-spacing:1.5px;margin:-4px -4px 12px;padding:8px 12px;border-radius:10px;color:#fff!important;text-align:center}
+.zt .ztit{background:#0F4C4F}.zc .ztit{background:#B7791F}
 </style>
 </head>
 <body>
@@ -1354,7 +1358,7 @@ html,body{overscroll-behavior-y:none}
 <script>'use strict';
 (function () {
   const root = window;
-  const VERSION = 33;
+  const VERSION = 34;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -1536,7 +1540,7 @@ html,body{overscroll-behavior-y:none}
       (dom ? '<div style="padding:8px 12px 0"><div class="banner">Es domingo: normalmente no se trabaja. Podés cargar igual si hace falta.</div></div>' : '') +
       respaldoBanner() + limpiezaBanner() +
       (diaBloqueado(S.fecha) ? lockBanner() : '') +
-      `<div class="search"><div class="qw"><input id="q" type="text" inputmode="search" autocomplete="off" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="qx" data-a="qclear" aria-label="Borrar búsqueda" ${S.q ? '' : 'hidden'}>✕</button></div><button class="btn sm filt ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">${S.solo ? 'Con saldo' : 'Todos'}</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Cerrar todos' : 'Abrir todos'}</button><button class="btn sm ghost" data-a="pg-abrir" style="flex-basis:100%">📋 Pegar lista (foto leída por Claude)</button></div>` +
+      `<div class="btnrow"><button class="btn sm ghost" data-a="pg-abrir">📋 Pegar lista</button><button class="btn sm filt ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">${S.solo ? 'Con saldo' : 'Todos'}</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Cerrar todos' : 'Abrir todos'}</button></div><div class="search"><div class="qw"><input id="q" type="text" inputmode="search" autocomplete="off" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="qx" data-a="qclear" aria-label="Borrar búsqueda" ${S.q ? '' : 'hidden'}>✕</button></div></div>` +
       `<div class="body" id="list">${listHTML()}</div><button class="upbtn" data-a="arriba" aria-label="Volver arriba" hidden>↑</button><div class="foot" id="foot">${footHTML()}</div>` + nav();
   }
 
@@ -1708,7 +1712,7 @@ ${filas || '<div class="empty">No se encontró ningún renglón con un monto.</d
     const nota = enCurso ? `Del 1/${ym.slice(5, 7)} al ${fechaCorta(hoy)} · mes en curso (se cierra el último día del mes)` : 'Mes cerrado · ranking final';
     const aviso = r.incompleto ? `<div class="banner"><b>Faltan datos:</b> el historial se limpió y los datos arrancan desde el ${esc(r.desde.slice(8, 10) + '/' + r.desde.slice(5, 7) + '/' + r.desde.slice(0, 4))}. Este ranking está incompleto.</div>` : (!r.hayDatos ? '<div class="banner">No hay días cargados en este mes.</div>' : '');
     const filas = r.filas.map((f) => `<div class="card rk ${f.color}"><span class="rkp">${f.pos}</span><span class="rkn"><b>${esc(f.name)}</b><small>${f.dias} ${f.dias === 1 ? 'día' : 'días'} con compra</small></span><b>${L.fmtAR(f.compra)}</b></div>`).join('');
-    return subHeader('Ranking de clientes') + `<div class="body">
+    return subHeader('Ranking de clientes') + `<div class="body"><button class="btn green" data-a="rk-pdf" style="width:100%">⬇ Descargar PDF</button>
 <div class="datebar" style="margin:0"><button data-a="rk-prev" aria-label="Mes anterior">‹</button><span class="d">${mesNombre(ym)}</span><button data-a="rk-next" aria-label="Mes siguiente"${enCurso ? ' disabled style="opacity:.3"' : ''}>›</button></div>
 <section class="card res"><div class="rline"><span>${nota}</span></div><div class="rline"><span>Compras del mes</span><b>${L.fmtAR(r.total)}</b></div><div class="rline"><span>Clientes con compras</span><b>${r.filas.length}</b></div>
 <div class="rk-leyenda"><span class="rk verde">1-10</span><span class="rk amarillo">11-20</span><span class="rk naranja">21-30</span><span class="rk rojo">31 en adelante</span></div></section>
@@ -1790,7 +1794,6 @@ ${c.pct != null ? `<div class="rline"><span>Variación</span><b style="color:${c
       case 'cform': return viewCForm();
       case 'cmasivo': return viewCMasivo();
       case 'ranking': return viewRanking();
-      case 'comparar': return viewComparar();
       case 'informe': return viewInforme();
       case 'lector': return viewLector();
       case 'notas': return viewNotas();
@@ -1818,7 +1821,6 @@ ${row('imprimir', 'Imprimir saldo clientes', 'PDF con todos los clientes (tambi�
 ${row('difcob', 'Diferencias por cobrador', 'Cobrado menos depositado de COB 1 y COB 2, día por día', false)}
 ${row('informe', 'Comparar meses', 'Informe de compras: mes contra mes, 60 días, Excel, pegar y respaldos viejos', true)}
 ${row('ranking', 'Ranking de clientes', 'Quién compra más en el mes (verde, amarillo, naranja, rojo)', true)}
-${row('comparar', 'Comparar un cliente', 'Compras de un cliente: un mes contra otro', true)}
 ${row('historial', 'Historial', 'Movimientos y saldo de cada cliente', false)}
 ${window.Licencia && window.Licencia.requerida ? row('licencia', 'Licencia', esc(window.Licencia.resumen()) + ' · tocá para renovar', false) : ''}
 ${row('clientes', 'Clientes', 'Altas, bajas, mail, teléfono y saldo inicial', true)}
@@ -1961,6 +1963,27 @@ ${row('archivar', 'Limpiar historial viejo', 'Si la app se pone lenta: borra dí
       g.textAlign = 'left'; g.fillStyle = '#7A3E00'; g.font = '500 17px ' + FUENTE; g.fillText('Desde esa fecha se ven día por día, con el acumulado que sigue sumando.', P + 22, y + 182); y += 230;
     }
     g.textAlign = 'center'; g.fillStyle = GRIS; g.font = '500 20px ' + FUENTE; g.fillText('Positivo: falta depositar · Negativo: sobra · Generado el ' + horaCorta(), W / 2, y + 40);
+    return cv;
+  }
+  function lienzoRanking(ym) {
+    const hoy = today(), enCurso = ym === hoy.slice(0, 7), r = L.rankingMes(DB, ym, enCurso ? hoy : null), W = 900, P = 36, RH = 50, fl = r.filas;
+    const H = 40 + 46 + 56 + 120 + 50 + Math.max(1, fl.length) * RH + 90;
+    const { cv, g } = nuevoLienzo(W, H); let y = 40; g.textAlign = 'left';
+    g.fillStyle = '#0F172A'; g.font = '800 34px ' + FUENTE; g.fillText('RANKING DE CLIENTES', P, y + 30); y += 46;
+    g.fillStyle = GRIS; g.font = '500 22px ' + FUENTE; g.fillText(mesNombre(ym) + (enCurso ? ' · mes en curso hasta el ' + fechaCorta(hoy) : ' · mes cerrado'), P, y + 24); y += 56;
+    g.fillStyle = '#F8FAFC'; g.rr(P, y, W - 2 * P, 100, 18); g.fill(); g.strokeStyle = '#E2E8F0'; g.lineWidth = 2; g.stroke();
+    g.fillStyle = GRIS; g.font = '700 21px ' + FUENTE; g.fillText('COMPRAS DEL MES', P + 22, y + 38); g.fillText('CLIENTES CON COMPRAS', W / 2 + 40, y + 38);
+    g.fillStyle = '#0F172A'; g.font = '700 32px ' + MONO; g.fillText('$' + L.fmtAR(r.total), P + 22, y + 82); g.fillText(String(fl.length), W / 2 + 40, y + 82); y += 120;
+    g.fillStyle = '#E2E8F0'; g.rr(P, y, W - 2 * P, 48, 10); g.fill(); g.fillStyle = '#334155'; g.font = '700 22px ' + FUENTE; g.fillText('Pos.', P + 16, y + 32); g.fillText('Cliente', P + 100, y + 32); g.textAlign = 'right'; g.fillText('Compra', W - P - 16, y + 32); g.textAlign = 'left'; y += 48;
+    const col = { verde: '#1E7A46', amarillo: '#B7791F', naranja: '#D9662B', rojo: '#B3261E' };
+    fl.forEach((f, n) => {
+      if (n % 2) { g.fillStyle = '#F1F5F9'; g.fillRect(P, y, W - 2 * P, RH); }
+      g.fillStyle = col[f.color] || '#1E293B'; g.font = '800 24px ' + FUENTE; g.textAlign = 'left'; g.fillText(String(f.pos), P + 16, y + 34);
+      g.fillStyle = '#1E293B'; g.font = '700 24px ' + FUENTE; g.fillText(String(f.name).slice(0, 30), P + 100, y + 34);
+      g.font = '600 23px ' + MONO; g.textAlign = 'right'; g.fillText(L.fmtAR(f.compra), W - P - 16, y + 34); y += RH;
+    });
+    if (!fl.length) { g.fillStyle = '#94A3B8'; g.font = '500 24px ' + FUENTE; g.textAlign = 'center'; g.fillText('Todavía no hay compras en este mes', W / 2, y + 34); y += RH; }
+    g.textAlign = 'center'; g.fillStyle = GRIS; g.font = '500 20px ' + FUENTE; g.fillText((r.incompleto ? 'Ranking incompleto (historial limpiado) · ' : '') + 'Generado el ' + horaCorta(), W / 2, y + 40);
     return cv;
   }
   // Muestra la pantalla "PDF listo" con vista previa y un solo botón Descargar PDF
@@ -2236,7 +2259,7 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
 ${line('Total cobrado', cobrado(t))}<p class="arsub">Efectivo COB 1 + Efectivo COB 2 + MercadoPago + Transferencia (del Cierre)</p>
 ${inp('ar-gen', '− Depósito efectivo', fv(rec.depositadoGeneral), 'data-arq="gen"', rec.depositadoGeneral != null && DB.arqueo[f] ? 'data-touched="1"' : '')}
 ${line('− MercadoPago', t.mercadopago)}${line('− Transferencia', t.transferencia)}
-${inp('ar-nf', '− Retiro', fv(rec.retiroNF), 'data-arq="1"')}<button class="btn sm ghost" data-a="retlink" style="margin:0 0 6px">🔒 ver retiros del mes</button>
+${inp('ar-nf', '− Retiro', fv(rec.retiroNF), 'data-arq="1"')}
 <div id="ar-cuadra" class="arsub" style="margin:2px 0 6px">${cuadraHTML(rec)}</div>
 ${R('= Diferencia (si da 0, cierra)', 'ar-rdg', x.dg, true)}${R('Acumulado', 'ar-rag', L.r2(p.g + x.dg))}
 <p class="arsub">El depósito se completa solo (depósito COB 1 + COB 2 − retiro). Si el banco te dio otro número, escribilo. Este depósito es el que pasa a Logística como efectivo depositado, sin descontar el retiro.</p></section>
@@ -2369,12 +2392,12 @@ ${d.desde ? `<div class="card" style="background:#FFF9E6;border:2px dashed #E8B8
     const un = Date.now() < S.titularUntil, c = L.armarCierre(DB, S.fecha, S.name), n = Object.keys(c.dia).length;
     const nada = !n && !c.arqueo && !c.logistica;
     return subHeader('Pasar datos') + `<div class="body">
-<section class="card zona zt"><div class="ztit">PARA EL TITULAR ${un ? '' : LOCK}</div>
+<section class="card zona zt"><div class="ztit">TITULAR ${un ? '' : LOCK}</div>
 <h2>Sumar cierre</h2><p>Abrí el archivo que te mandó el cobrador. Se <b>suma</b> a tus datos: no se borra nada. Si ya tenías algo distinto en un cliente, queda lo tuyo.</p>
 ${un ? '<label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-c" type="file" accept=".json,application/json" hidden></label>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}
 <h2 style="margin-top:16px">Enviar datos al día</h2><p>Genera un archivo con todos los datos al día (también sirve para mandar una corrección de días anteriores). Los cobradores lo reciben con <b>Recibir datos</b>.</p>
 ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</button>' : '<button class="btn ghost" data-a="p-pin" style="width:100%">DESBLOQUEAR CON PIN</button>'}</section>
-<section class="card zona zc"><div class="ztit">PARA EL COBRADOR</div>
+<section class="card zona zc"><div class="ztit">COBRADOR</div>
 <h2>Enviar cierre</h2><p>Manda lo que cargaste el <b>${esc(fechaLarga(S.fecha))}</b>: ${n} ${n === 1 ? 'cliente' : 'clientes'}${c.arqueo ? ', arqueo' : ''}${c.logistica ? ', logística' : ''}. Para cambiar el día, volvé a Cierre y elegí otra fecha.</p>
 <button class="btn green" data-a="p-enviar" ${nada ? 'disabled style="opacity:.4;width:100%"' : 'style="width:100%"'}>ENVIAR CIERRE</button>
 <h2 style="margin-top:16px">Recibir datos del titular</h2><p>Abrí el archivo que mandó el titular. Se actualizan los saldos y los días corregidos. Lo que ya cargaste hoy sin guardar no se pierde.</p>
@@ -2612,6 +2635,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'hist-pdf') { const s = document.getElementById('hist-mes'); pdfHistorial(S.selCli, s && s.value ? s.value : today().slice(0, 7), 'historial'); }
     else if (a === 'hist-pdf-lista') { S.selCli = v; pdfHistorial(v, today().slice(0, 7), 'historial'); }
     else if (a === 'pdf-bajar') { if (S.hpdf) { bajar(S.hpdf.nombre, S.hpdf.blob); toast('PDF guardado en Descargas.', 3500); } }
+    else if (a === 'rk-pdf') { const ym = S.rk || today().slice(0, 7); prepararPdf(lienzoRanking(ym), 'ranking-clientes-' + ym + '.pdf', 'ranking'); }
     else if (a === 'dcf-pdf') prepararPdf(lienzoDifCob(S.dcf || 'ambos'), 'diferencias-cobradores-' + (S.dcf || 'ambos') + '-' + today() + '.pdf', 'difcob');
     else if (a === 'dcf') { S.dcf = v; render(); }
     else if (a === 'rc-fin') {
@@ -2642,7 +2666,6 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       render();
     }
     else if (a === 'rc-quitar') { DB.retEstado.ref = null; persist(); render(); }
-    else if (a === 'retlink') requirePin(() => { S.tab = 'mas'; S.sub = 'retiros'; S.rmes = today().slice(0, 7); render(); }, true);
     else if (a === 'lg-co') {
       S.lgDraft = Object.assign({ fecha: S.fecha }, lgVals());
       requirePin(() => { S.lgCoOk = S.fecha; render(); }, true);
@@ -2661,7 +2684,6 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       else if (v === 'licencia') window.Licencia.abrir();
       else if (v === 'informe') requirePin(() => { S.inf = null; S.sub = 'informe'; render(); });
       else if (v === 'ranking') requirePin(() => { S.rk = null; S.sub = 'ranking'; render(); });
-      else if (v === 'comparar') requirePin(() => { S.cmp = null; S.sub = 'comparar'; render(); });
       else if (v === 'historial') { S.sub = 'historial'; S.selCli = null; S.hq = ''; render(); }
       else if (v === 'clientes') requirePin(() => { S.sub = 'clientes'; S.hq = ''; render(); });
       else if (v === 'notas') { S.sub = 'notas'; render(); }
