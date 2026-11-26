@@ -166,6 +166,9 @@ html,body{overscroll-behavior-y:none}
 
 .foot .saldobtn{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;padding:5px 10px;line-height:1.15}
 .foot .saldobtn>span{font-size:11px;font-weight:700;color:#55625F}.foot .saldobtn b{font-size:19px}.foot .saldobtn small{font-size:10px;color:#55625F;font-weight:500}
+
+.lic-rejilla{position:absolute;left:8%;right:8%;top:10%;bottom:10%;background:repeating-linear-gradient(#5B6668 0 2px,#E9EEF0 2px 6px);border-radius:3px}
+.lic-ventilador{position:absolute;left:50%;top:50%;width:46%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,#2A3234 0 14%,#8A9496 16% 60%,#2A3234 62%)}
 </style>
 </head>
 <body>
@@ -666,6 +669,21 @@ html,body{overscroll-behavior-y:none}
     if (ref) { const lim = sumarDias(ref, -59); Object.keys(e.dia).forEach((d) => { if (d < lim) delete e.dia[d]; }); }
   }
 
+  // PDF de una sola hoja a partir de una imagen JPEG (bytes). La hoja se alarga según el alto de la imagen.
+  function pdfImagen(jpeg, w, h, anchoPt) {
+    anchoPt = anchoPt || 842; const hp = Math.round(anchoPt * h / w * 100) / 100;
+    let bin = ''; for (let i = 0; i < jpeg.length; i += 8192) bin += String.fromCharCode.apply(null, jpeg.subarray(i, i + 8192));
+    const parts = [], off = []; let len = 0; const add = (s) => { parts.push(s); len += s.length; };
+    const obj = (id, body) => { off[id] = len; add(id + ' 0 obj\n' + body + '\nendobj\n'); };
+    add('%PDF-1.4\n');
+    obj(1, '<< /Type /Catalog /Pages 2 0 R >>'); obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + anchoPt + ' ' + hp + '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>');
+    obj(4, '<< /Type /XObject /Subtype /Image /Width ' + w + ' /Height ' + h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + bin.length + ' >>\nstream\n' + bin + '\nendstream');
+    const c = 'q ' + anchoPt + ' 0 0 ' + hp + ' 0 0 cm /Im0 Do Q\n'; obj(5, '<< /Length ' + c.length + ' >>\nstream\n' + c + 'endstream');
+    const xr = len; let x = 'xref\n0 6\n0000000000 65535 f \n'; for (let i = 1; i <= 5; i++) x += String(off[i]).padStart(10, '0') + ' 00000 n \n';
+    add(x + 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xr + '\n%%EOF\n');
+    const s = parts.join(''), out = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255; return out;
+  }
   function diaAnterior(f) { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   // Día por día: lo cobrado en efectivo, lo depositado (general + retiro NF), la diferencia y el acumulado general.
   function detalleArqueo(db) {
@@ -884,7 +902,7 @@ html,body{overscroll-behavior-y:none}
     return { hay: true, meses, desde: primero, corte };
   }
 
-  const api = { saldoTotal, avisoLimpieza, rankingMes, compararMeses, mesMas, r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, informeMensual, compras60, mesIncompleto, ultimoDiaHabil, leerComprasMes, armarPegado, cargarPegado, borrarPegado, importarCompras, borrarImportado, estVacio, estMes, sumarDias, listaSaldos, pdfSaldos, retirosMes, retirosAFecha, estadoRetiros, resultadoCierreMes, CIERRE_MES, difCobradores, retiroDia, diaAnterior, detalleArqueo, leerLista, avisoRepetida, duplicadosDia, esDescartado, leerContactos, armarContactos, aplicarContactos, csvContactos, buscarCliente, armarLista, aplicarLista, normNom };
+  const api = { saldoTotal, avisoLimpieza, rankingMes, compararMeses, mesMas, r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, informeMensual, compras60, mesIncompleto, ultimoDiaHabil, leerComprasMes, armarPegado, cargarPegado, borrarPegado, importarCompras, borrarImportado, estVacio, estMes, sumarDias, listaSaldos, pdfSaldos, pdfImagen, retirosMes, retirosAFecha, estadoRetiros, resultadoCierreMes, CIERRE_MES, difCobradores, retiroDia, diaAnterior, detalleArqueo, leerLista, avisoRepetida, duplicadosDia, esDescartado, leerContactos, armarContactos, aplicarContactos, csvContactos, buscarCliente, armarLista, aplicarLista, normNom };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.R284 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -1089,21 +1107,25 @@ html,body{overscroll-behavior-y:none}
     return el;
   }
   function construirCamion(reparto) {
-    const n = String(reparto || ''), fs = n.length <= 2 ? 62 : n.length === 3 ? 56 : 44;
+    const n = String(reparto || ''), fs = n.length <= 2 ? 72 : n.length === 3 ? 64 : 50;
     const num = n ? '<span class="lic-num" style="font-size:' + fs + 'px">' + esc(n) + '</span>' : '';
     const franja = '<i class="lic-franja"></i><i class="lic-marco"></i>';
     const esc3 = document.createElement('div'); esc3.className = 'lic-esc';
     // chasis
     esc3.appendChild(caja({ w: 232, h: 10, d: 50, x: -10, y: 35, z: 0, c: { pz: '#2A3234', nz: '#2A3234', px: '#2A3234', nx: '#2A3234', t: '#3A4446', b: '#1B2123' } }));
     // furgón blanco con el número de reparto
-    esc3.appendChild(caja({ w: 156, h: 80, d: 78, x: -48, y: -10, z: 0,
+    esc3.appendChild(caja({ w: 156, h: 104, d: 78, x: -48, y: -22, z: 0,
       c: { pz: '#FFFFFF', nz: '#F3F6F5', px: '#E4E9E7', nx: '#E4E9E7', t: '#FBFCFC', b: '#9AA3A1' },
       f: { pz: num + franja, nz: num + franja, nx: '<i class="lic-puerta"></i><i class="lic-marco"></i>' } }));
     // cabina corta
-    esc3.appendChild(caja({ w: 62, h: 66, d: 78, x: 65, y: -3, z: 0,
+    esc3.appendChild(caja({ w: 62, h: 58, d: 78, x: 65, y: 1, z: 0,
       c: { pz: '#FFFFFF', nz: '#FFFFFF', px: '#F4F6F6', nx: '#E4E9E7', t: '#FFFFFF', b: '#122' },
       f: { pz: '<i class="lic-vent"></i><i class="lic-mani"></i><i class="lic-franja"></i>', nz: '<i class="lic-vent"></i><i class="lic-mani"></i><i class="lic-franja"></i>',
            px: '<i class="lic-parabrisas"></i><i class="lic-faro l"></i><i class="lic-faro r"></i><i class="lic-parrilla"></i>' } }));
+    // equipo de frío: pegado a la pared frontal del furgón, por encima del techo de la cabina
+    esc3.appendChild(caja({ w: 20, h: 30, d: 54, x: 40, y: -54, z: 0,
+      c: { pz: '#B4BCBF', nz: '#B4BCBF', px: '#A7B0B3', nx: '#98A1A4', t: '#C6CDD0', b: '#7C8588' },
+      f: { px: '<i class="lic-rejilla"></i><i class="lic-ventilador"></i>', pz: '<i class="lic-marco"></i>', nz: '<i class="lic-marco"></i>' } }));
     // paragolpe
     esc3.appendChild(caja({ w: 8, h: 12, d: 82, x: 99, y: 24, z: 0, c: { pz: '#3A4446', nz: '#3A4446', px: '#4A5658', nx: '#3A4446', t: '#4A5658', b: '#1B2123' } }));
     // espejos
@@ -1332,7 +1354,7 @@ html,body{overscroll-behavior-y:none}
 <script>'use strict';
 (function () {
   const root = window;
-  const VERSION = 30;
+  const VERSION = 33;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -1777,6 +1799,7 @@ ${c.pct != null ? `<div class="rline"><span>Variación</span><b style="color:${c
       case 'pasar': return viewPasar();
       case 'retiros': return viewRetiros();
       case 'difcob': return viewDifCob();
+      case 'pdflisto': return viewPdfListo();
       case 'resumen': return viewResumen();
       default: return viewMas();
     }
@@ -1829,16 +1852,142 @@ ${row('archivar', 'Limpiar historial viejo', 'Si la app se pone lenta: borra dí
     const q = norm(S.hq.trim());
     const rows = DB.clients.filter((c) => !q || norm(c.name).includes(q)).map((c) => {
       const sa = L.saldoHasta(DB, c.id, '9999-12-31', true);
-      return `<div class="card"><button class="crow" data-a="hsel" data-v="${c.id}"><span class="n">${esc(c.name)}${c.active === false ? ' <small>(inactivo)</small>' : ''}</span><span class="sal ${cls(sa)}">${L.fmtAR(sa)}</span></button></div>`;
+      return `<div class="card" style="display:flex;align-items:center;gap:4px;padding-right:4px"><button class="crow" data-a="hsel" data-v="${c.id}" style="flex:1"><span class="n">${esc(c.name)}${c.active === false ? ' <small>(inactivo)</small>' : ''}</span><span class="sal ${cls(sa)}">${L.fmtAR(sa)}</span></button><button class="chip" data-a="hist-pdf-lista" data-v="${c.id}" aria-label="Descargar PDF de ${esc(c.name)}" style="flex:0 0 auto;font-size:20px;background:#E6EEEC">⬇</button></div>`;
     });
     return rows.join('') || '<div class="empty">No hay clientes con ese nombre.</div>';
   }
+  // ---- Imagen del historial de un cliente (para descargar y compartir) ----
+  function mesesConMov(cid) {
+    const m = new Set(); Object.keys(DB.allTxns).forEach((d) => { const t = DB.allTxns[d][cid]; if (t && L.KEYS.some((k) => t[k])) m.add(d.slice(0, 7)); });
+    return Array.from(m).sort().reverse();
+  }
+  function datosHistImg(cid, ym) {
+    const c = DB.clients.find((x) => x.id === cid), dias = [];
+    Object.keys(DB.allTxns).filter((d) => d.slice(0, 7) === ym).sort().forEach((d) => {
+      const t = DB.allTxns[d][cid]; if (!t || !L.KEYS.some((k) => t[k])) return;
+      dias.push({ d, ini: L.saldoHasta(DB, cid, d, false), fin: L.saldoHasta(DB, cid, d, true), compra: t.compra || 0, ef1: t.efectivo1 || 0, ef2: t.efectivo2 || 0, mp: t.mercadopago || 0, tr: t.transferencia || 0, aj: t.ajuste || 0 });
+    });
+    return { c, dias, finMes: dias.length ? dias[dias.length - 1].fin : L.saldoHasta(DB, cid, ym + '-31', true) };
+  }
+  // ---- PDF de una sola hoja (se dibuja en un lienzo y se guarda como hoja PDF) ----
+  const FUENTE = 'system-ui, -apple-system, Roboto, Arial, sans-serif', MONO = 'ui-monospace, Menlo, Consolas, monospace';
+  const ROJO = '#C62828', VERDE = '#1E7A46', GRIS = '#64748B';
+  function nuevoLienzo(W, H) {
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, W, H); g.textBaseline = 'alphabetic';
+    g.rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    return { cv, g };
+  }
+  const horaCorta = () => { const d = new Date(); return fechaCorta(today()) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const dm = (f) => f.slice(8, 10) + '/' + f.slice(5, 7);
+  const cero = (v) => (Math.abs(v) < 0.005 ? '–' : L.fmtAR(v));
+  const fsTxt = (n) => (n > 0.004 ? 'falta $' + L.fmtAR(n) : n < -0.004 ? 'sobra $' + L.fmtAR(-n) : '$0,00');
+  const fsCol = (n) => (n > 0.004 ? ROJO : n < -0.004 ? VERDE : GRIS);
+  function lienzoHist(cid, ym) {
+    const { c, dias } = datosHistImg(cid, ym), sa = L.saldoHasta(DB, cid, '9999-12-31', true), W = 1400, P = 40, RH = 54;
+    const H = 40 + 56 + 190 + 30 + 300 + 30 + 60 + Math.max(1, dias.length) * RH + 80;
+    const { cv, g } = nuevoLienzo(W, H); let y = 40;
+    g.fillStyle = GRIS; g.font = '700 26px ' + FUENTE; g.textAlign = 'left'; g.fillText(('HISTORIAL DEL CLIENTE · ' + mesNombre(ym)).toUpperCase().split('').join(' '), P, y + 20); y += 56;
+    g.fillStyle = '#0F172A'; g.rr(P, y, W - 2 * P, 190, 28); g.fill();
+    g.fillStyle = '#FFFFFF'; g.font = '700 46px ' + FUENTE; g.fillText(String(c.name).toUpperCase(), P + 36, y + 78);
+    g.fillStyle = '#94A3B8'; g.font = '500 28px ' + FUENTE; g.fillText('saldo inicial cargado: $' + L.fmtAR(c.saldoInicial), P + 36, y + 140);
+    g.textAlign = 'right'; g.fillStyle = '#94A3B8'; g.font = '600 24px ' + FUENTE; g.fillText('SALDO ACTUAL', W - P - 36, y + 60);
+    g.fillStyle = '#FFFFFF'; g.font = '700 64px ' + MONO; g.fillText('$' + L.fmtAR(sa), W - P - 36, y + 132); g.textAlign = 'left'; y += 190 + 30;
+    // gráfico (saldo final de cada día del mes)
+    const gx = P + 20, gw = W - 2 * P - 40, gy = y + 10, gh = 230;
+    if (dias.length) {
+      const vals = dias.map((d) => d.fin), mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rg = (mx - mn) || 1, pd = rg * 0.12;
+      const dd = dias.map((d) => Number(d.d.slice(8, 10))), d0 = dd[0], sp = (dd[dd.length - 1] - d0) || 1;
+      const pts = dias.map((d, k) => [dias.length === 1 ? gx + gw / 2 : gx + ((dd[k] - d0) / sp) * gw, gy + gh - ((d.fin - mn + pd) / (rg + 2 * pd)) * gh]);
+      g.strokeStyle = '#D97706'; g.lineWidth = 6; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+      for (let k = 1; k < pts.length; k++) { const mx2 = (pts[k - 1][0] + pts[k][0]) / 2; g.bezierCurveTo(mx2, pts[k - 1][1], mx2, pts[k][1], pts[k][0], pts[k][1]); }
+      g.stroke(); if (pts.length === 1) { g.fillStyle = '#D97706'; g.beginPath(); g.arc(pts[0][0], pts[0][1], 9, 0, 7); g.fill(); }
+      g.fillStyle = '#94A3B8'; g.font = '500 24px ' + FUENTE; const nl = Math.min(8, dias.length);
+      for (let k = 0; k < nl; k++) { const q = nl === 1 ? 0 : Math.round(k * (dias.length - 1) / (nl - 1)); g.textAlign = k === 0 ? 'left' : k === nl - 1 ? 'right' : 'center'; g.fillText(dm(dias[q].d), k === 0 ? gx : k === nl - 1 ? gx + gw : pts[q][0], gy + gh + 46); }
+    } else { g.fillStyle = '#94A3B8'; g.font = '500 28px ' + FUENTE; g.textAlign = 'center'; g.fillText('Sin movimientos en este mes', W / 2, gy + gh / 2); }
+    g.textAlign = 'left'; y += 300 + 30;
+    // tabla: una fila por día con movimiento (la más antigua arriba)
+    const cols = [['Fecha', 120, 'l'], ['Saldo inicial', 170, 'r'], ['Compra', 160, 'r'], ['Ajuste', 130, 'r'], ['Efectivo', 285, 'r'], ['MercadoPago', 165, 'r'], ['Transf./otros', 150, 'r'], ['Saldo final', 165, 'r']];
+    const tot = cols.reduce((s, x) => s + x[1], 0), k0 = (W - 2 * P) / tot; let x0 = P;
+    g.fillStyle = '#E2E8F0'; g.rr(P, y, W - 2 * P, 50, 10); g.fill(); g.fillStyle = '#334155'; g.font = '700 22px ' + FUENTE;
+    const xs = cols.map((cl) => { const x = x0; x0 += cl[1] * k0; return [x, x0]; });
+    cols.forEach((cl, k) => { g.textAlign = cl[2] === 'l' ? 'left' : 'right'; g.fillText(cl[0], cl[2] === 'l' ? xs[k][0] + 16 : xs[k][1] - 16, y + 33); }); y += 50;
+    dias.forEach((d, n) => {
+      if (n % 2) { g.fillStyle = '#F1F5F9'; g.fillRect(P, y, W - 2 * P, RH); }
+      const ef = L.r2(d.ef1 + d.ef2), cob = d.ef1 && d.ef2 ? 'Cob-1+2' : d.ef1 ? 'Cob-1' : d.ef2 ? 'Cob-2' : '';
+      const vals = [dm(d.d), cero(d.ini), cero(d.compra), cero(d.aj), cero(ef), cero(d.mp), cero(d.tr), L.fmtAR(d.fin)], yy = y + 35;
+      vals.forEach((v, k) => {
+        g.textAlign = k === 0 ? 'left' : 'right'; g.font = (k === 0 ? '700 24px ' : k === 7 ? '700 24px ' : '500 24px ') + (k === 0 ? FUENTE : MONO);
+        g.fillStyle = k === 7 ? (d.fin > 0.004 ? ROJO : d.fin < -0.004 ? VERDE : '#1E293B') : (v === '–' ? '#94A3B8' : '#1E293B');
+        g.fillText(v, k === 0 ? xs[k][0] + 16 : xs[k][1] - 16, yy);
+      });
+      if (cob) { g.textAlign = 'left'; g.fillStyle = '#64748B'; g.font = '600 17px ' + FUENTE; g.fillText(cob, xs[4][0] + 12, yy - 2); }
+      y += RH;
+    });
+    if (!dias.length) { g.fillStyle = '#94A3B8'; g.font = '500 26px ' + FUENTE; g.textAlign = 'center'; g.fillText('Sin movimientos', W / 2, y + 36); y += RH; }
+    g.textAlign = 'center'; g.fillStyle = '#64748B'; g.font = '500 20px ' + FUENTE; g.fillText('Rojo: debe · Verde: a favor · Cob-1/Cob-2: cobrador del efectivo · Generado el ' + horaCorta(), W / 2, y + 50);
+    return cv;
+  }
+  function lienzoDifCob(f) {
+    const d = L.difCobradores(DB), W = 900, P = 36, RH = 50, two = f === 'ambos', filas = d.filas.slice().reverse(), ult = d.filas[d.filas.length - 1];
+    const H = 40 + 70 + 56 + 50 + Math.max(1, filas.length) * RH + 30 + 150 + (d.desde ? 230 : 0) + 90;
+    const { cv, g } = nuevoLienzo(W, H); let y = 40; g.textAlign = 'left';
+    g.fillStyle = '#0F172A'; g.font = '800 34px ' + FUENTE; g.fillText('DIFERENCIAS POR COBRADOR', P, y + 30); y += 46;
+    g.fillStyle = GRIS; g.font = '500 22px ' + FUENTE; g.fillText((f === 'ambos' ? 'COB 1 y COB 2' : 'COB ' + f) + ' · efectivo cobrado − efectivo depositado', P, y + 24); y += 56;
+    const cx = two ? [P, W - P - 330, W - P] : [P, W - P]; // columnas: fecha | valores alineados a la derecha
+    g.fillStyle = '#E2E8F0'; g.rr(P, y, W - 2 * P, 48, 10); g.fill(); g.fillStyle = '#334155'; g.font = '700 22px ' + FUENTE;
+    g.fillText('Fecha', P + 16, y + 32); g.textAlign = 'right';
+    if (two) { g.fillText('COB 1', cx[1] - 16, y + 32); g.fillText('COB 2', cx[2] - 16, y + 32); } else g.fillText('COB ' + f, W - P - 16, y + 32);
+    g.textAlign = 'left'; y += 48;
+    const pv = (x, n) => (n === 1 ? x.d1 : x.d2);
+    filas.forEach((x, n) => {
+      if (n % 2) { g.fillStyle = '#F1F5F9'; g.fillRect(P, y, W - 2 * P, RH); }
+      g.fillStyle = '#1E293B'; g.font = '700 24px ' + FUENTE; g.textAlign = 'left'; g.fillText(dm(x.fecha), P + 16, y + 34); g.font = '600 23px ' + MONO; g.textAlign = 'right';
+      const put = (v, xr) => { g.fillStyle = fsCol(v); g.fillText(fsTxt(v), xr, y + 34); };
+      if (two) { put(x.d1, cx[1] - 16 + 0); put(x.d2, cx[2] - 16); } else put(f === '1' ? x.d1 : x.d2, W - P - 16);
+      y += RH;
+    });
+    if (!filas.length) { g.fillStyle = '#94A3B8'; g.font = '500 24px ' + FUENTE; g.textAlign = 'center'; g.fillText('Todavía no hay arqueos', W / 2, y + 34); y += RH; }
+    y += 30; g.textAlign = 'left';
+    const tarj = (n, v, x, w) => { g.fillStyle = '#F8FAFC'; g.rr(x, y, w, 130, 18); g.fill(); g.strokeStyle = '#E2E8F0'; g.lineWidth = 2; g.stroke(); g.fillStyle = GRIS; g.font = '700 22px ' + FUENTE; g.textAlign = 'left'; g.fillText('ACUMULADO COB ' + n, x + 22, y + 42); g.fillStyle = fsCol(v); g.font = '700 36px ' + MONO; g.fillText(fsTxt(v), x + 22, y + 98); };
+    const aw = two ? (W - 2 * P - 20) / 2 : W - 2 * P;
+    if (two) { tarj(1, ult ? ult.a1 : d.base.c1, P, aw); tarj(2, ult ? ult.a2 : d.base.c2, P + aw + 20, aw); } else tarj(f, f === '1' ? (ult ? ult.a1 : d.base.c1) : (ult ? ult.a2 : d.base.c2), P, aw);
+    y += 130 + 30;
+    if (d.desde) {
+      g.fillStyle = '#FFF9E6'; g.rr(P, y, W - 2 * P, 200, 18); g.fill(); g.strokeStyle = '#E8B84A'; g.lineWidth = 2; g.stroke();
+      g.fillStyle = '#7A3E00'; g.font = '700 24px ' + FUENTE; g.textAlign = 'left'; g.fillText('Antes del ' + d.desde.slice(8, 10) + '/' + d.desde.slice(5, 7) + '/' + d.desde.slice(0, 4) + ' (días ya limpiados)', P + 22, y + 46);
+      g.font = '700 26px ' + MONO; let yy = y + 94;
+      [['COB 1', d.base.c1, '1'], ['COB 2', d.base.c2, '2']].filter((r) => f === 'ambos' || f === r[2]).forEach((r) => { g.fillStyle = '#7A3E00'; g.textAlign = 'left'; g.font = '700 24px ' + FUENTE; g.fillText(r[0], P + 22, yy); g.textAlign = 'right'; g.font = '700 26px ' + MONO; g.fillStyle = fsCol(r[1]); g.fillText(fsTxt(r[1]), W - P - 22, yy); yy += 40; });
+      g.textAlign = 'left'; g.fillStyle = '#7A3E00'; g.font = '500 17px ' + FUENTE; g.fillText('Desde esa fecha se ven día por día, con el acumulado que sigue sumando.', P + 22, y + 182); y += 230;
+    }
+    g.textAlign = 'center'; g.fillStyle = GRIS; g.font = '500 20px ' + FUENTE; g.fillText('Positivo: falta depositar · Negativo: sobra · Generado el ' + horaCorta(), W / 2, y + 40);
+    return cv;
+  }
+  // Muestra la pantalla "PDF listo" con vista previa y un solo botón Descargar PDF
+  function prepararPdf(cv, nombre, volver) {
+    const url = cv.toDataURL('image/jpeg', 0.92), b64 = url.split(',')[1], bin = atob(b64), jpeg = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) jpeg[i] = bin.charCodeAt(i);
+    const pdf = L.pdfImagen(jpeg, cv.width, cv.height, 842);
+    S.hpdf = { nombre, blob: new Blob([pdf], { type: 'application/pdf' }), prev: url, volver }; S.sub = 'pdflisto'; render();
+  }
+  function viewPdfListo() {
+    const P = S.hpdf; if (!P) { S.sub = null; return render(); }
+    return subHeader('PDF listo') + `<div class="body"><section class="card res"><div class="rline big"><span>PDF listo (1 hoja)</span></div><p class="arsub" style="margin:4px 0 8px">${esc(P.nombre)}</p><button class="btn green" data-a="pdf-bajar" style="width:100%">DESCARGAR PDF</button></section>
+<div class="card" style="padding:6px"><img src="${P.prev}" alt="Vista previa del PDF" style="width:100%;display:block;border-radius:8px"></div></div>` + nav();
+  }
+  function pdfHistorial(cid, ym, volver) {
+    const c = DB.clients.find((x) => x.id === cid); if (!c) return;
+    prepararPdf(lienzoHist(cid, ym), 'historial-' + String(c.name).replace(/[^A-Za-z0-9]+/g, '-').toLowerCase() + '-' + ym + '.pdf', volver);
+  }
+
   function viewHistorial() {
     if (!S.selCli) return subHeader('Historial') + `<div class="search"><input id="hq" type="search" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.hq)}"></div><div class="body" id="list2">${histListHTML()}</div>` + nav();
     const c = DB.clients.find((x) => x.id === S.selCli); if (!c) { S.selCli = null; return viewHistorial(); }
     const sa = L.saldoHasta(DB, c.id, '9999-12-31', true);
     const rows = histRows(c.id).map((r) => `<div class="hrow"><span><b>${fechaCorta(r.d)}</b>${r.aj ? `<small>Ajuste ${L.fmtAR(r.aj)}</small>` : ''}</span><span>${L.fmtAR(r.compra)}</span><span class="neg">${L.fmtAR(r.pago)}</span><b class="${cls(r.saldo)}">${L.fmtAR(r.saldo)}</b></div>`).join('');
+    const mm = mesesConMov(c.id), mact = today().slice(0, 7), mmv = mm.includes(mact) ? mm : [mact].concat(mm), sel = mmv.includes(S.histMes) ? S.histMes : mact;
     return subHeader(esc(c.name)) + `<div class="body"><div class="card" style="display:flex;justify-content:space-between"><span>Saldo actual</span><b class="sal ${cls(sa)}">${L.fmtAR(sa)}</b></div>
+<div class="card" style="display:flex;gap:8px;align-items:center"><select id="hist-mes" aria-label="Mes del PDF" style="flex:1;height:44px;font-size:15px;border:1px solid #B8C8C5;border-radius:10px;padding:0 8px">${mmv.map((m) => `<option value="${m}"${m === sel ? ' selected' : ''}>Mes del PDF: ${esc(mesNombre(m))}</option>`).join('')}</select><button class="btn green" data-a="hist-pdf" style="flex:0 0 auto;padding:0 14px;height:44px">⬇ Descargar PDF</button></div>
 <div class="card" style="padding:0;overflow:hidden"><div class="hrow hh"><span>Día</span><span>Compra</span><span>Pagó</span><span>Saldo</span></div>${rows || '<div class="empty">Sin movimientos todavía.</div>'}<div class="hrow"><span><b>${c.saldoDesde ? 'Antes del ' + fechaCorta(c.saldoDesde) : 'Inicio'}</b></span><span></span><span></span><b>${L.fmtAR(c.saldoInicial)}</b></div></div></div>` + nav();
   }
 
@@ -1978,6 +2127,7 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
   // Para mandar por WhatsApp/mail si el celular deja; si no, se baja a Descargas.
+  const nombreResp = () => { const t = today(); return 'resp_am_' + t.slice(8, 10) + t.slice(5, 7) + '.json'; }; // resp_am_ddmm
   async function entregar(nombre, blob, aviso) {
     try {
       const f = new File([blob], nombre, { type: blob.type });
@@ -2007,14 +2157,14 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     return `<div style="padding:8px 12px 0"><div class="banner" style="background:#FDE7E5;border-color:#B3261E;color:#8C1D18"><b>⚠️ Respaldo pendiente.</b> ${cuando} Si se pierde el celular se pierde todo.<br><button class="btn red sm" data-a="resp-ya" style="margin-top:8px;width:100%">RESPALDAR AHORA (Drive, WhatsApp…)</button></div></div>`;
   }
   async function respaldoRapido() {
-    const ok = await entregar('respaldo-cuenta-corriente-' + today() + '.json', new Blob([JSON.stringify(datosCompletos(), null, 2)], { type: 'application/json' }), 'Respaldo guardado en Descargas. Subilo a tu Drive.');
+    const ok = await entregar(nombreResp(), new Blob([JSON.stringify(datosCompletos(), null, 2)], { type: 'application/json' }), 'Respaldo guardado en Descargas. Subilo a tu Drive.');
     if (ok) { marcarRespaldo(); render(); }
   }
   function hacerRespaldo() {
     marcarRespaldo();
     if (!S.rJ && !S.rX) return toast('Elegí al menos un archivo.', 3000);
     let demora = 0;
-    if (S.rJ) { bajar('respaldo-cuenta-corriente-' + today() + '.json', new Blob([JSON.stringify(datosCompletos(), null, 2)], { type: 'application/json' })); demora = 700; }
+    if (S.rJ) { bajar(nombreResp(), new Blob([JSON.stringify(datosCompletos(), null, 2)], { type: 'application/json' })); demora = 700; }
     if (S.rX) setTimeout(() => bajar('planilla-cuenta-corriente-' + today() + '.xlsx', new Blob([root.R284X.makeXlsx(L.filasExcel(DB))], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })), demora);
     toast('Respaldo hecho. Buscalo en Descargas.', 3500);
   }
@@ -2200,17 +2350,20 @@ ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${coOk ?
 ${ref ? `<div class="banner" style="margin:0"><b>Cierre de referencia del ${esc(fch(ref.fecha).slice(0, 5))}: resultado $${L.fmtAR(ref.resultado)}</b> <button class="btn sm ghost" data-a="rc-quitar" style="margin-left:8px">Quitar</button></div>` : ''}</div>` + nav();
   }
   function viewDifCob() {
-    const d = L.difCobradores(DB), f = S.dcf || 'ambos', fmt = (n) => `<b style="color:${Math.abs(n) < 0.005 ? '#1B2B2A' : n > 0 ? '#B3261E' : '#1E7A46'}">${L.fmtAR(n)}</b>`;
-    const val = (x) => f === '1' ? [x.d1, x.a1] : f === '2' ? [x.d2, x.a2] : [L.r2(x.d1 + x.d2), L.r2(x.a1 + x.a2)];
-    const baseV = f === '1' ? d.base.c1 : f === '2' ? d.base.c2 : L.r2(d.base.c1 + d.base.c2);
-    const fl = d.filas.slice().reverse().map((x) => { const [dif, ac] = val(x); return `<div class="card" style="display:flex;justify-content:space-between;gap:10px"><span><b>${esc(fechaCorta(x.fecha))}</b><small style="display:block;color:#55625F">Diferencia del día</small></span><span style="text-align:right">${fmt(dif)}<small style="display:block;color:#55625F">Acumulado ${L.fmtAR(ac)}</small></span></div>`; }).join('');
+    const d = L.difCobradores(DB), f = S.dcf || 'ambos', two = f === 'ambos', ult = d.filas[d.filas.length - 1];
+    const val = (v) => `<b style="color:${fsCol(v)}">${fsTxt(v)}</b>`;
+    const fl = d.filas.slice().reverse().map((x) => `<div class="card" style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>${esc(fechaCorta(x.fecha))}</b><span style="text-align:right">${two ? `<small style="color:#55625F">COB 1</small> ${val(x.d1)}<br><small style="color:#55625F">COB 2</small> ${val(x.d2)}` : val(f === '1' ? x.d1 : x.d2)}</span></div>`).join('');
+    const a1 = ult ? ult.a1 : d.base.c1, a2 = ult ? ult.a2 : d.base.c2;
+    const tarj = (n, v) => `<div class="card" style="flex:1"><small style="color:#55625F;font-weight:700">ACUMULADO COB ${n}</small><div style="font-size:20px;margin-top:4px">${val(v)}</div></div>`;
     const tab = (k, t) => `<button class="btn sm ${f === k ? 'on' : 'ghost'}" data-a="dcf" data-v="${k}">${t}</button>`;
+    const ff = d.desde ? d.desde.slice(8, 10) + '/' + d.desde.slice(5, 7) + '/' + d.desde.slice(0, 4) : '';
     return subHeader('Diferencias por cobrador') + `<div class="body">
-<div class="search" style="padding:0">${tab('1', 'COB 1')}${tab('2', 'COB 2')}${tab('ambos', 'AMBOS')}</div>
-<p class="arsub">Diferencia = efectivo cobrado − efectivo depositado. Positivo: falta depositar. Negativo: se depositó de más.</p>
-<div class="card" style="display:flex;justify-content:space-between"><span><b>Saldo a última limpieza</b><small style="display:block;color:#55625F">${d.desde ? esc(fechaCorta(d.desde)) : 'Sin limpieza todavía'} · para días anteriores usá el respaldo</small></span><b>${L.fmtAR(baseV)}</b></div>
+<div class="search" style="padding:0">${tab('ambos', 'AMBOS')}${tab('1', 'COB 1')}${tab('2', 'COB 2')}</div>
+<p class="arsub">Diferencia = efectivo cobrado − efectivo depositado. <span style="color:${ROJO}">Falta</span>: falta depositar. <span style="color:${VERDE}">Sobra</span>: se depositó de más.</p>
 ${fl || '<div class="empty">Todavía no hay arqueos.</div>'}
-<button class="btn green" data-a="dcf-xls" style="width:100%">DESCARGAR / COMPARTIR (Excel)</button></div>` + nav();
+<div style="display:flex;gap:8px">${two ? tarj(1, a1) + tarj(2, a2) : tarj(f, f === '1' ? a1 : a2)}</div>
+${d.desde ? `<div class="card" style="background:#FFF9E6;border:2px dashed #E8B84A"><b style="color:#7A3E00">Antes del ${ff} (días ya limpiados)</b>${two || f === '1' ? `<div class="rline"><span>COB 1</span>${val(d.base.c1)}</div>` : ''}${two || f === '2' ? `<div class="rline"><span>COB 2</span>${val(d.base.c2)}</div>` : ''}<p class="arsub" style="margin:6px 0 0">Desde el ${esc(ff.slice(0, 5))} se ven día por día, con el acumulado que sigue sumando. Para días anteriores, usá el respaldo que se descargó al limpiar.</p></div>` : ''}
+<button class="btn green" data-a="dcf-pdf" style="width:100%">DESCARGAR PDF</button></div>` + nav();
   }
   function viewPasar() {
     const un = Date.now() < S.titularUntil, c = L.armarCierre(DB, S.fecha, S.name), n = Object.keys(c.dia).length;
@@ -2456,12 +2609,11 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       S.modal = { title: 'Saldo Total de clientes', ok: 'CERRAR', text: `<div style="text-align:left">${ln('Al empezar el día (cierre del día anterior)', s0)}${ln('+ Compras', t.compras)}${ln('− Efectivo COB 1', t.efectivo1, true)}${ln('− Efectivo COB 2', t.efectivo2, true)}${ln('− MercadoPago', t.mercadopago, true)}${ln('− Transferencia', t.transferencia, true)}<div class="rline"><span>± Ajustes</span><b>${t.ajuste > 0 ? '+' : ''}${L.fmtAR(t.ajuste)}</b></div><div class="rline big"><span>= Saldo Total ${diaBloqueado(S.fecha) ? 'final del día' : 'hasta ahora'}</span><b>${L.fmtAR(s1)}</b></div></div>` };
       render();
     }
+    else if (a === 'hist-pdf') { const s = document.getElementById('hist-mes'); pdfHistorial(S.selCli, s && s.value ? s.value : today().slice(0, 7), 'historial'); }
+    else if (a === 'hist-pdf-lista') { S.selCli = v; pdfHistorial(v, today().slice(0, 7), 'historial'); }
+    else if (a === 'pdf-bajar') { if (S.hpdf) { bajar(S.hpdf.nombre, S.hpdf.blob); toast('PDF guardado en Descargas.', 3500); } }
+    else if (a === 'dcf-pdf') prepararPdf(lienzoDifCob(S.dcf || 'ambos'), 'diferencias-cobradores-' + (S.dcf || 'ambos') + '-' + today() + '.pdf', 'difcob');
     else if (a === 'dcf') { S.dcf = v; render(); }
-    else if (a === 'dcf-xls') {
-      const d = L.difCobradores(DB), f = S.dcf || 'ambos', rows = [['Fecha', 'Diferencia', 'Acumulado']];
-      d.filas.forEach((x) => rows.push([x.fecha, f === '1' ? x.d1 : f === '2' ? x.d2 : L.r2(x.d1 + x.d2), f === '1' ? x.a1 : f === '2' ? x.a2 : L.r2(x.a1 + x.a2)]));
-      entregar('diferencias-' + (f === 'ambos' ? 'ambos' : 'cob' + f) + '-' + today() + '.xlsx', new Blob([root.R284X.makeXlsx([{ name: 'Diferencias', rows }])], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    }
     else if (a === 'rc-fin') {
       const r = L.resultadoCierreMes(DB.retEstado.cierre);
       const vaciar = () => { DB.retEstado.cierre = {}; persist(); render(); };
@@ -2541,6 +2693,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     }
     else if (a === 'subback' && S.sub === 'cmasivo') { if (S.cmas && S.cmas.paso === 'revisar') S.cmas.paso = 'texto'; else { S.cmas = null; S.sub = 'clientes'; } render(); }
     else if (a === 'subback' && S.pegar) { if (S.pegar.paso === 'revisar') S.pegar.paso = 'texto'; else S.pegar = null; render(); }
+    else if (a === 'subback' && S.sub === 'pdflisto') { S.sub = (S.hpdf && S.hpdf.volver) || null; S.hpdf = null; render(); }
     else if (a === 'subback') { if (S.sub === 'cform') { S.sub = 'clientes'; S.edit = null; } else if (S.sub === 'historial' && S.selCli) S.selCli = null; else S.sub = null; render(); }
     else if (a === 'hsel') { S.selCli = v; render(); }
     else if (a === 'cnew') { S.edit = 'nuevo'; S.sub = 'cform'; render(); }
@@ -2608,6 +2761,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
   app.addEventListener('change', (e) => {
     const t = e.target;
     if (t.dataset && (t.dataset.ret || t.dataset.rc)) { persist(); return; }
+    if (t.id === 'hist-mes') { S.histMes = t.value; return; }
     if (t.id === 'pm-mes') { infEstado().pmYm = t.value; render(); return; }
     if (t.id === 'inf-mes') { infEstado().ym = t.value; render(); return; }
     if (t.id === 'imp-file' && t.files && t.files.length) return leerRespaldosViejos(Array.from(t.files));
