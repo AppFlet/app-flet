@@ -1532,7 +1532,7 @@ html,body{overscroll-behavior-y:none}
 <script>'use strict';
 (function () {
   const root = window;
-  const VERSION = 39;
+  const VERSION = 41;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -1997,7 +1997,7 @@ ${c ? `<section class="card sec"><h2>Para el titular</h2><button class="btn ghos
     const lkC = P.campo === 'compra' && comprasBloq(f), lk = diaBloqueado(f) || lkC, tit = Date.now() < S.titularUntil;
     return subHeader('Pegar lista') + `<div class="body">
 ${lk ? (lkC && !diaBloqueado(f) ? '<div class="banner"><b>Las compras de ' + esc(fechaLarga(f)) + ' ya están confirmadas.</b> Solo el titular puede destrabarlas desde Cierre.</div>' : '<div class="banner"><b>El día ' + esc(fechaLarga(f)) + ' está guardado.</b> Volvé a Cierre y destrabalo antes de pegar una lista.</div>') : ''}
-<section class="card sec"><h2>1. ¿Qué lista es?</h2><div class="chips">${PG_CAMPOS.map((x) => `<button class="btn sm ${P.campo === x[0] ? 'on' : 'ghost'}" data-a="pg-campo" data-v="${x[0]}">${x[1]}</button>`).join('')}</div>
+<section class="card sec"><h2>1. ¿Qué lista es?</h2><div class="chips">${PG_CAMPOS.filter((x) => x[0] !== 'efectivo1' && x[0] !== 'efectivo2').map((x) => `<button class="btn sm ${P.campo === x[0] ? 'on' : 'ghost'}" data-a="pg-campo" data-v="${x[0]}">${x[1]}</button>`).join('')}</div>
 <p style="margin:10px 0 0">Se carga en <b>${esc(fechaLarga(f))}</b>.</p></section>
 <section class="card sec"><h2>2. ${lectorCfg() ? 'Sacá la foto' : 'Leé la foto con Claude'}</h2>
 ${lectorCfg() ? `<p>${(P.fotos || []).length ? '<b>' + P.fotos.length + ' foto(s) lista(s).</b> Podés agregar otra si la planilla tiene más hojas.' : 'Sacá la foto de la planilla. Si tiene varias hojas, sacá una foto de cada una.'}</p>
@@ -2692,8 +2692,8 @@ ${R('= Diferencia', 'ar-rd2', x.d2)}${R('Acumulado', 'ar-ra2', L.r2(p.c2 + x.d2)
     const avisoEf = difEf ? `<div class="banner" style="background:#FDE7E5;border-color:#B3261E"><b>⚠️ El efectivo no coincide con el Arqueo.</b> El Depósito efectivo del Arqueo del ${esc(fechaCorta(sug.fechaArqueo))} es <b>${L.fmtAR(sug.efectivoAyer)}</b> y acá hay <b>${L.fmtAR(saved.efectivoAyer || 0)}</b>.${lk ? ' Destrabá para corregirlo.' : '<br><button class="btn sm" data-a="lg-usar" style="margin-top:8px;width:100%">USAR EL DEL ARQUEO</button>'}</div>` : '';
     const html = header('Logística', true) + `<div class="body">${lk ? bannerBloq(saved, 'ldestr') : ''}${avisoEf}
 <section class="card sec"><h2>RENDICIÓN ${esc(fechaCorta(fAnt))}</h2><div class="grid2">
-${inp('lg-ef', 'Efectivo depositado' + (sug.fechaArqueo ? ' (Arqueo ' + fechaCorta(sug.fechaArqueo) + ')' : ''), fv(rec.efectivoAyer), 'data-lg="1"')}${inp('lg-mp', 'MercadoPago', fv(rec.mercadopagoAyer), 'data-lg="1"')}
-${inp('lg-tr', 'Transferencia', fv(rec.transferenciaAyer), 'data-lg="1"')}</div></section>
+${inp('lg-ef', 'Efectivo depositado' + (sug.fechaArqueo ? ' (Arqueo ' + fechaCorta(sug.fechaArqueo) + ')' : ''), fv(rec.efectivoAyer), 'data-lg="1" readonly style="background:#EEF1F0"')}${inp('lg-mp', 'MercadoPago', fv(rec.mercadopagoAyer), 'data-lg="1" readonly style="background:#EEF1F0"')}
+${inp('lg-tr', 'Transferencia', fv(rec.transferenciaAyer), 'data-lg="1" readonly style="background:#EEF1F0"')}</div><p style="margin:8px 0 0"><small>🔒 Estos tres valores vienen solos de ayer (Arqueo y Cierre). No se editan.</small></p></section>
 <section class="card sec"><h2>ACREDITACIÓN LLSSA</h2><div class="grid2">
 ${inp('lg-pa', 'Pagos afectados', fv(rec.pagosAfectado), 'data-lg="1"')}${coOk ? inp('lg-co', 'Corrección (+ / −)', fv(rec.correccion), 'data-lg="1"') : `<label class="f">Corrección (+ / −) 🔒<input type="text" id="lg-co" data-lg="1" value="${fv(rec.correccion)}" placeholder="0,00" readonly data-a="lg-co" class="${rec.correccion ? 'has' : ''}" style="background:#EEF1F0"><small style="color:#55625F">Tocá para editar (PIN del titular)</small></label>`}</div></section>
 <section class="card res"><div class="rline big"><span>Diferencia del día</span><span id="lg-rd">${difBadge(d, 'Falta acreditar', 'Acreditó de más')}</span></div>
