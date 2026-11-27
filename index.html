@@ -123,6 +123,7 @@ button,input{font:inherit}
 .lic-parabrisas{left:10%;right:10%;top:10%;height:36%}
 .lic-faro{position:absolute;bottom:22%;width:16%;height:12%;background:#FFF3B0;border-radius:3px}.lic-faro.l{left:8%}.lic-faro.r{right:8%}
 .lic-parrilla{position:absolute;left:34%;right:34%;bottom:20%;height:12%;background:#0F3436;border-radius:2px}
+.lic-farol{position:absolute;bottom:20px;width:13px;height:16px;background:linear-gradient(#E53935 0 65%,#FFB300 65% 100%);border-radius:2px;border:1px solid #7A1C1C;box-sizing:border-box}.lic-farol.l{left:5px}.lic-farol.r{right:5px}
 .lic-puerta{position:absolute;left:46%;top:8%;bottom:8%;width:2px;background:#B8C2C0}
 .lic-tit{font-size:30px;font-weight:900;letter-spacing:4px}.lic-nom{font-size:18px;margin-top:6px;font-weight:600;text-align:center;padding:0 20px}.lic-rep{font-size:16px;margin-top:4px;opacity:.9}
 .lic-toque{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));font-size:13px;opacity:.7}
@@ -1283,13 +1284,16 @@ html,body{overscroll-behavior-y:none}
     const n = String(reparto || ''), fs = n.length <= 2 ? 72 : n.length === 3 ? 64 : 50;
     const num = n ? '<span class="lic-num" style="font-size:' + fs + 'px">' + esc(n) + '</span>' : '';
     const franja = '<i class="lic-franja"></i><i class="lic-marco"></i>';
+    const fsT = n.length <= 2 ? 40 : n.length === 3 ? 30 : 24;
+    const numT = n ? '<span class="lic-num" style="font-size:' + fsT + 'px">' + esc(n) + '</span>' : '';
+    const trasera = numT + '<i class="lic-farol l"></i><i class="lic-farol r"></i>' + franja;
     const esc3 = document.createElement('div'); esc3.className = 'lic-esc';
     // chasis
     esc3.appendChild(caja({ w: 232, h: 10, d: 50, x: -10, y: 35, z: 0, c: { pz: '#2A3234', nz: '#2A3234', px: '#2A3234', nx: '#2A3234', t: '#3A4446', b: '#1B2123' } }));
     // furgón blanco con el número de reparto
     esc3.appendChild(caja({ w: 156, h: 104, d: 78, x: -48, y: -22, z: 0,
       c: { pz: '#FFFFFF', nz: '#F3F6F5', px: '#E4E9E7', nx: '#E4E9E7', t: '#FBFCFC', b: '#9AA3A1' },
-      f: { pz: num + franja, nz: num + franja, nx: '<i class="lic-puerta"></i><i class="lic-marco"></i>' } }));
+      f: { pz: num + franja, nz: num + franja, nx: trasera } }));
     // cabina corta
     esc3.appendChild(caja({ w: 62, h: 58, d: 78, x: 65, y: 1, z: 0,
       c: { pz: '#FFFFFF', nz: '#FFFFFF', px: '#F4F6F6', nx: '#E4E9E7', t: '#FFFFFF', b: '#122' },
@@ -1299,14 +1303,16 @@ html,body{overscroll-behavior-y:none}
     esc3.appendChild(caja({ w: 20, h: 30, d: 54, x: 40, y: -54, z: 0,
       c: { pz: '#B4BCBF', nz: '#B4BCBF', px: '#A7B0B3', nx: '#98A1A4', t: '#C6CDD0', b: '#7C8588' },
       f: { px: '<i class="lic-rejilla"></i><i class="lic-ventilador"></i>', pz: '<i class="lic-marco"></i>', nz: '<i class="lic-marco"></i>' } }));
+    // paragolpe trasero
+    esc3.appendChild(caja({ w: 8, h: 12, d: 82, x: -130, y: 24, z: 0, c: { pz: '#3A4446', nz: '#3A4446', px: '#4A5658', nx: '#4A5658', t: '#4A5658', b: '#1B2123' } }));
     // paragolpe
     esc3.appendChild(caja({ w: 8, h: 12, d: 82, x: 99, y: 24, z: 0, c: { pz: '#3A4446', nz: '#3A4446', px: '#4A5658', nx: '#3A4446', t: '#4A5658', b: '#1B2123' } }));
     // espejos de camión: brazo + espejo grande + espejo convexo chico, a cada lado de la cabina
     const carcasa = { pz: '#20282A', nz: '#20282A', px: '#20282A', nx: '#9DB4C0', t: '#20282A', b: '#20282A' };
     [-1, 1].forEach((s) => {
-      esc3.appendChild(caja({ w: 4, h: 4, d: 14, x: 82, y: -14, z: s * 44, c: { pz: '#20282A', nz: '#20282A', px: '#20282A', nx: '#20282A', t: '#20282A', b: '#20282A' } }));
-      esc3.appendChild(caja({ w: 5, h: 28, d: 13, x: 82, y: -12, z: s * 54, c: carcasa }));
-      esc3.appendChild(caja({ w: 4, h: 10, d: 9, x: 82, y: 6, z: s * 52, c: carcasa }));
+      esc3.appendChild(caja({ w: 3, h: 3, d: 11, x: 82, y: -14, z: s * 44, c: { pz: '#20282A', nz: '#20282A', px: '#20282A', nx: '#20282A', t: '#20282A', b: '#20282A' } }));
+      esc3.appendChild(caja({ w: 4, h: 22, d: 10, x: 82, y: -12, z: s * 53, c: carcasa }));
+      esc3.appendChild(caja({ w: 3, h: 8, d: 7, x: 82, y: 4, z: s * 51, c: carcasa }));
     });
     // ruedas (eje trasero y delantero)
     [-1, 1].forEach((s) => { esc3.appendChild(rueda(-72, 43, s * 40)); esc3.appendChild(rueda(72, 43, s * 40)); });
@@ -1532,7 +1538,7 @@ html,body{overscroll-behavior-y:none}
 <script>'use strict';
 (function () {
   const root = window;
-  const VERSION = 41;
+  const VERSION = 42;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
