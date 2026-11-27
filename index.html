@@ -341,6 +341,170 @@ html,body{overscroll-behavior-y:none}
       arqueo: algo(ar, IGUALES_AR) ? ar : null, logistica: algo(lg, IGUALES_LG) ? lg : null };
   }
 
+
+  // ---- Tokens de autorización (sin servidor): el titular genera, el empleado valida con la clave compartida ----
+  const TOK_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sin O, I, L, 0, 1
+  const TOK_TIPOS = { U: 'un uso', D: 'desactivar hoy', P: 'desactivar siempre', A: 'reactivar control' };
+  async function tokMac(clave, tipo, serial, fecha) {
+    const enc = new TextEncoder(), cs = globalThis.crypto.subtle;
+    const k = await cs.importKey('raw', enc.encode('r284tok:' + clave), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const m = new Uint8Array(await cs.sign('HMAC', k, enc.encode(tipo + '|' + serial + '|' + (fecha || ''))));
+    let out = ''; for (let i = 0; i < 6; i++) out += TOK_ABC[m[i] % TOK_ABC.length];
+    return out;
+  }
+  const tokSerialTxt = (n) => String(n % 10000).padStart(4, '0');
+  // fecha: solo para el tipo D (vale ese día)
+  async function tokCrear(clave, tipo, serial, fecha) {
+    const sr = tokSerialTxt(serial);
+    return tipo + sr + '-' + (await tokMac(clave, tipo, sr, tipo === 'D' ? fecha : ''));
+  }
+  async function tokLeer(clave, texto, hoy) {
+    const t = String(texto || '').toUpperCase().replace(/[\s-]/g, '');
+    if (!/^[UDPA]\d{4}[A-Z2-9]{6}$/.test(t)) return { ok: false, error: 'El código no es válido.' };
+    const tipo = t[0], sr = t.slice(1, 5), mac = t.slice(5);
+    if (mac !== (await tokMac(clave, tipo, sr, tipo === 'D' ? hoy : ''))) return { ok: false, error: tipo === 'D' ? 'El código no es válido o no es de hoy.' : 'El código no es válido.' };
+    return { ok: true, tipo, serial: sr, id: tipo + sr };
+  }
+  // ---- Cambios sobre lo ya enviado ----
+  // Solo cuenta como cambio un valor que ya estaba cargado y ahora es distinto (lo nuevo no es un cambio).
+  function diffDia(antes, ahora, nombres) {
+    const out = [];
+    Object.keys(antes || {}).forEach((cid) => KEYS.forEach((k) => {
+      const a = r2((antes[cid] || {})[k] || 0), d = r2(((ahora || {})[cid] || {})[k] || 0);
+      if (a !== 0 && a !== d) out.push({ cid, nombre: (nombres || {})[cid] || cid, k, antes: a, despues: d });
+    }));
+    return out;
+  }
+  function aplicarCambios(db, f, cambios) {
+    let n = 0;
+    (cambios || []).forEach((c) => {
+      if (!db.clients.some((x) => x.id === c.cid) || !KEYS.includes(c.k)) return;
+      if (!db.allTxns[f]) db.allTxns[f] = {};
+      const d = db.allTxns[f]; if (!d[c.cid]) d[c.cid] = KEYS.reduce((o, k) => { o[k] = 0; return o; }, {});
+      d[c.cid][c.k] = r2(c.despues); n++;
+      if (KEYS.every((k) => !d[c.cid][k])) delete d[c.cid];
+    });
+    if (n && db.allTxns[f] && !db.allTxns[f].__meta__) db.allTxns[f].__meta__ = { editadoPor: '', actualizadoEl: new Date().toISOString(), guardado: false };
+    return n;
+  }
+  const CAMPOS_REUBIC = ['efectivo1', 'efectivo2', 'mercadopago', 'transferencia'];
+  // Pasa un cobro de un cliente a otro en el mismo día (no toca las compras ni el arqueo)
+  function reubicar(db, f, o) {
+    const monto = r2(o.monto);
+    if (!CAMPOS_REUBIC.includes(o.campo)) return { ok: false, error: 'Elegí qué cobro es.' };
+    if (!o.de || !o.a || o.de === o.a) return { ok: false, error: 'Elegí dos clientes distintos.' };
+    if (!db.clients.some((x) => x.id === o.de) || !db.clients.some((x) => x.id === o.a)) return { ok: false, error: 'Cliente no encontrado.' };
+    if (!(monto > 0)) return { ok: false, error: 'Escribí un monto mayor a cero.' };
+    const d = (db.allTxns || {})[f] || {}, ori = d[o.de];
+    if (!ori || r2(ori[o.campo] || 0) < monto) return { ok: false, error: 'Ese cliente no tiene cargado tanto en ese cobro.' };
+    ori[o.campo] = r2(ori[o.campo] - monto);
+    if (!d[o.a]) d[o.a] = KEYS.reduce((x, k) => { x[k] = 0; return x; }, {});
+    d[o.a][o.campo] = r2((d[o.a][o.campo] || 0) + monto);
+    if (KEYS.every((k) => !ori[k])) delete d[o.de];
+    return { ok: true };
+  }
+
+
+  // ---- Control de partes de devolución y C.c. ----
+  // Cada registro: { id, clave, fecha (carga), estado: 'nuevo' | 'afectado' | 'pendiente', afectadoEl, por, ... }
+  const ctlNuevo = () => ({ partes: [], cc: [] });
+  const ctlNorm = (x) => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const ctlSinCeros = (x) => ctlNorm(x).replace(/^0+(?=\d)/, '');
+  const ctlLista = (ctl, tipo) => (tipo === 'cc' ? ctl.cc : ctl.partes);
+  const ctlId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  // Clientes de partes (Millán / Cencosud): se puede escribir el código completo o solo los últimos números.
+  const CTL_DESTINOS_MIOS = [
+    { grupo: 'MILLAN', nombre: 'Central', cod: '80000339' }, { grupo: 'MILLAN', nombre: 'Olascoaga', cod: '30005128' },
+    { grupo: 'MILLAN', nombre: 'M. Fierro', cod: '30005092' }, { grupo: 'MILLAN', nombre: 'Roca', cod: '30005129' },
+    { grupo: 'MILLAN', nombre: 'Bosque', cod: '30005201' },
+    { grupo: 'CENCOSUD', nombre: 'San Miguel', cod: '30000719' }, { grupo: 'CENCOSUD', nombre: 'Independencia', cod: '30000609' }];
+  function ctlDestinoBuscar(destinos, txt) {
+    const ds = destinos || [], t = String(txt || '').trim();
+    if (!t) return { ok: false, error: 'Escribí el número de cliente.' };
+    if (!ds.length) return { ok: false, error: 'Primero cargá los clientes de partes.' };
+    const dig = t.replace(/\D/g, '');
+    let m;
+    if (dig && dig === t.replace(/[\s.-]/g, '')) {
+      m = ds.filter((d) => ctlSinCeros(d.cod) === ctlSinCeros(dig));
+      if (!m.length && dig.length >= 3) m = ds.filter((d) => ctlNorm(d.cod).endsWith(dig.replace(/^0+/, '')) && dig.replace(/^0+/, '').length >= 3);
+    } else { const n = normNom(t); m = ds.filter((d) => normNom(d.nombre) === n); if (!m.length) m = ds.filter((d) => normNom(d.nombre).includes(n)); }
+    if (!m.length) return { ok: false, error: 'No encontré ese cliente.' };
+    if (m.length > 1) return { ok: false, error: 'Es ambiguo: escribí más números.', varios: m };
+    return { ok: true, dest: m[0] };
+  }
+  function ctlAgregar(ctl, tipo, d, hoy, por) {
+    const clave = String(d.clave || '').trim();
+    if (ctlNorm(clave).length < 2) return { ok: false, error: 'Escribí el número.' };
+    if (tipo === 'cc' && !String(d.cliente || '').trim()) return { ok: false, error: 'Elegí el cliente.' };
+    if (tipo !== 'cc' && !String(d.cod || '').trim()) return { ok: false, error: 'Escribí el número de cliente.' };
+    const ya = ctlLista(ctl, tipo).find((x) => ctlSinCeros(x.clave) === ctlSinCeros(clave) && (tipo === 'cc' ? (x.cid || x.cliente) === (d.cid || d.cliente) : ctlSinCeros(x.cod) === ctlSinCeros(d.cod)));
+    if (ya) return { ok: false, dup: true, error: ya.estado === 'pendiente' ? 'Ya está en pendientes.' : ya.estado === 'afectado' ? 'Ya figura como afectado.' : 'Ya está cargado.' };
+    const r = { id: ctlId(), clave, fecha: hoy, estado: 'nuevo', afectadoEl: '', por: por || '' };
+    if (tipo === 'cc') { r.cid = d.cid || ''; r.cliente = String(d.cliente).trim(); }
+    else { r.cod = String(d.cod).trim(); r.dest = String(d.dest || '').trim(); }
+    ctlLista(ctl, tipo).push(r); return { ok: true, item: r };
+  }
+  const ctlParaTildar = (ctl, tipo, hoy) => ctlLista(ctl, tipo).filter((x) => x.estado === 'nuevo' && x.fecha < hoy);
+  // Los tildados quedan afectados; los demás pasan a pendientes
+  function ctlResolver(ctl, tipo, tildados, hoy) {
+    let a = 0, p = 0;
+    ctlParaTildar(ctl, tipo, hoy).forEach((x) => { if (tildados.includes(x.id)) { x.estado = 'afectado'; x.afectadoEl = hoy; a++; } else { x.estado = 'pendiente'; p++; } });
+    return { afectados: a, pendientes: p };
+  }
+  // Un pendiente que apareció: se busca por número y se cierra
+  function ctlCerrar(ctl, tipo, clave, hoy, cod) {
+    if (ctlNorm(clave).length < 2) return { ok: false, error: 'Escribí el número.' };
+    if (tipo !== 'cc' && !String(cod || '').trim()) return { ok: false, error: 'Escribí el número de cliente.' };
+    const m = ctlLista(ctl, tipo).filter((x) => x.estado === 'pendiente' && ctlSinCeros(x.clave) === ctlSinCeros(clave) && (tipo === 'cc' || !x.cod || ctlSinCeros(x.cod) === ctlSinCeros(cod)));
+    if (!m.length) return { ok: false, error: 'Ese número no está en pendientes.' };
+    if (m.length > 1) return { ok: false, error: 'Hay varios pendientes con ese número. Cerralos de a uno desde la lista.', varios: m };
+    m[0].estado = 'afectado'; m[0].afectadoEl = hoy; return { ok: true, item: m[0] };
+  }
+  const ctlCerrarId = (ctl, tipo, id, hoy) => { const x = ctlLista(ctl, tipo).find((y) => y.id === id && y.estado === 'pendiente'); if (!x) return false; x.estado = 'afectado'; x.afectadoEl = hoy; return true; };
+  // Se limpian los ya afectados de más de 90 días. Los pendientes y lo rescatado no se borran.
+  function ctlLimpiar(ctl, hoy, dias) {
+    const corte = sumarDias(hoy, -(dias || 90)); let n = 0;
+    ['partes', 'cc'].forEach((t) => {
+      const antes = ctl[t].length;
+      ctl[t] = ctl[t].filter((x) => !(x.estado === 'afectado' && !x.resc && (x.afectadoEl || x.fecha) < corte));
+      n += antes - ctl[t].length;
+    });
+    return n;
+  }
+  // Trae de respaldos viejos solo lo de este botón (lo que ya no está)
+  function ctlRescatar(ctl, respaldos, aplicar) {
+    let nuevos = 0, ya = 0;
+    respaldos.forEach((o) => ['partes', 'cc'].forEach((t) => ((o.control && o.control[t]) || []).forEach((x) => {
+      if (!x || !x.id || !x.clave) return;
+      if (ctl[t].some((y) => y.id === x.id)) { ya++; return; }
+      nuevos++; if (aplicar) ctl[t].push(Object.assign({}, x, { resc: true }));
+    })));
+    return { nuevos, ya };
+  }
+  // Cada renglón: CLIENTE y REMITO (en ese orden). Si el cliente no se reconoce, queda marcado y no se agrega.
+  function ctlLeerPartes(txt, destinos) {
+    const out = [];
+    String(txt || '').split(/\r?\n/).forEach((ln) => {
+      const t = ln.split(/[\s,;\t]+/).map((x) => x.trim()).filter(Boolean);
+      if (t.length < 2 || !/\d/.test(t[1]) || t[1].length < 2) return;
+      const b = ctlDestinoBuscar(destinos, t[0]);
+      out.push({ clave: t[1], cod: b.ok ? b.dest.cod : '', dest: b.ok ? b.dest.nombre : t[0], sinCliente: !b.ok });
+    });
+    return out;
+  }
+  function ctlLeerCC(txt, clientes) {
+    const out = [];
+    String(txt || '').split(/\r?\n/).forEach((ln) => {
+      ln = ln.trim(); if (!ln) return;
+      const t = ln.split(/[;\t]+/).length > 1 ? ln.split(/[;\t]+/).map((x) => x.trim()).filter(Boolean) : ln.split(/\s+/);
+      const fac = t.pop(); const nom = t.join(' ').trim();
+      if (!nom || !fac || !/\d/.test(fac)) return;
+      const b = buscarCliente(clientes, nom);
+      out.push({ cliente: b ? b.name : nom, cid: b ? b.id : '', clave: fac, sinCliente: !b });
+    });
+    return out;
+  }
+
   // Suma el cierre del empleado a los datos del titular. Si ya había algo distinto, manda el titular.
   function sumarCierre(db, c, aplicar) {
     const f = c.fecha, r = { agregados: [], completados: [], iguales: [], conflictos: [], desconocidos: [], arqueo: '', logistica: '' };
@@ -649,12 +813,17 @@ html,body{overscroll-behavior-y:none}
   // Importa SOLO las compras por día de respaldos viejos; une clientes por nombre; no duplica días ya a la vista, archivados o importados.
   function importarCompras(db, respaldos, aplicar) {
     const e = est(db); let nuevos = 0, repetidos = 0; const sinMatch = new Set(); const agregar = {};
+    // El respaldo más nuevo va primero: si un día está en varios, manda el más nuevo.
+    respaldos = respaldos.slice().sort((a, b) => String(b.exportedAt || '').localeCompare(String(a.exportedAt || '')));
     respaldos.forEach((o) => {
       const mapa = {}; (o.clients || []).forEach((c) => { const b = buscarCliente(db.clients, c.name); mapa[c.id] = b ? b.id : 'n:' + String(c.name || '').toUpperCase().replace(/\s+/g, ' '); if (!b) sinMatch.add(c.name); });
-      Object.keys(o.allTxns || {}).sort().forEach((d) => {
+      const guardado = (o.baseSemana && o.baseSemana.comprasImp) || {}; // compras de días ya limpiados que la web guardó aparte
+      const fechas = Object.keys(o.allTxns || {}).concat(Object.keys(guardado).filter((d) => !(o.allTxns || {})[d])).sort();
+      fechas.forEach((d) => {
         if ((db.allTxns || {})[d] || e.dia[d] || e.imp[d] || agregar[d]) { repetidos++; return; }
-        const x = {}; const dia = o.allTxns[d];
-        Object.keys(dia).forEach((cid) => { if (cid === '__meta__' || !mapa[cid]) return; const v = r2(Number(dia[cid].compra) || 0); if (v) sumar(x, mapa[cid], v); });
+        const x = {};
+        if ((o.allTxns || {})[d]) { const dia = o.allTxns[d]; Object.keys(dia).forEach((cid) => { if (cid === '__meta__' || !mapa[cid]) return; const v = r2(Number(dia[cid].compra) || 0); if (v) sumar(x, mapa[cid], v); }); }
+        else { const dia = guardado[d]; Object.keys(dia).forEach((cid) => { if (!mapa[cid]) return; const v = r2(Number(dia[cid]) || 0); if (v) sumar(x, mapa[cid], v); }); }
         if (Object.keys(x).length) { agregar[d] = x; nuevos++; }
       });
     });
@@ -906,7 +1075,7 @@ html,body{overscroll-behavior-y:none}
     return { hay: true, meses, desde: primero, corte };
   }
 
-  const api = { saldoTotal, avisoLimpieza, rankingMes, compararMeses, mesMas, r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, informeMensual, compras60, mesIncompleto, ultimoDiaHabil, leerComprasMes, armarPegado, cargarPegado, borrarPegado, importarCompras, borrarImportado, estVacio, estMes, sumarDias, listaSaldos, pdfSaldos, pdfImagen, retirosMes, retirosAFecha, estadoRetiros, resultadoCierreMes, CIERRE_MES, difCobradores, retiroDia, diaAnterior, detalleArqueo, leerLista, avisoRepetida, duplicadosDia, esDescartado, leerContactos, armarContactos, aplicarContactos, csvContactos, buscarCliente, armarLista, aplicarLista, normNom };
+  const api = { CTL_DESTINOS_MIOS, ctlDestinoBuscar, ctlNuevo, ctlAgregar, ctlParaTildar, ctlResolver, ctlCerrar, ctlCerrarId, ctlLimpiar, ctlRescatar, ctlLeerPartes, ctlLeerCC, ctlLista, tokCrear, tokLeer, TOK_TIPOS, diffDia, aplicarCambios, reubicar, CAMPOS_REUBIC, saldoTotal, avisoLimpieza, rankingMes, compararMeses, mesMas, r2, parseAR, fmtAR, KEYS, mov, saldoHasta, totalesDia, arqueoDia, arqueoAcum, difLog, logAcum, sugLogistica, resumenCorte, limpiarAntes, armarCierre, sumarCierre, cargasSinEnviar, filasExcel, recibirDatos, textoResumen, informeMensual, compras60, mesIncompleto, ultimoDiaHabil, leerComprasMes, armarPegado, cargarPegado, borrarPegado, importarCompras, borrarImportado, estVacio, estMes, sumarDias, listaSaldos, pdfSaldos, pdfImagen, retirosMes, retirosAFecha, estadoRetiros, resultadoCierreMes, CIERRE_MES, difCobradores, retiroDia, diaAnterior, detalleArqueo, leerLista, avisoRepetida, duplicadosDia, esDescartado, leerContactos, armarContactos, aplicarContactos, csvContactos, buscarCliente, armarLista, aplicarLista, normNom };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.R284 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -932,7 +1101,7 @@ html,body{overscroll-behavior-y:none}
   const NEGOCIO_FIJO = '';            // nombre en la pantalla de inicio (versión propia). Puede quedar vacío.
   const WHATSAPP_NUMERO = '';         // opcional: número con código de país, sin + ni espacios. Vacío = elegir contacto.
   const DIAS_AVISO = 5;               // desde cuántos días antes aparece el aviso amarillo
-  const SPLASH_MS = 1500;             // duración de la pantalla de inicio
+  const SPLASH_MS = 4500;             // duración de la pantalla de inicio
 
   // Clave PÚBLICA (JWK, ECDSA P-256). No es secreta.
   const CLAVE_PUBLICA = {"kty":"EC","crv":"P-256","x":"tI1ME0p1qHLTgIniePfYz-b1jqTfvz68BfyAQ_1U6PU","y":"vztUfuAXO9sibjCipGoDINviOed8bbV9gBzbqbkBcYA"};
@@ -1132,8 +1301,13 @@ html,body{overscroll-behavior-y:none}
       f: { px: '<i class="lic-rejilla"></i><i class="lic-ventilador"></i>', pz: '<i class="lic-marco"></i>', nz: '<i class="lic-marco"></i>' } }));
     // paragolpe
     esc3.appendChild(caja({ w: 8, h: 12, d: 82, x: 99, y: 24, z: 0, c: { pz: '#3A4446', nz: '#3A4446', px: '#4A5658', nx: '#3A4446', t: '#4A5658', b: '#1B2123' } }));
-    // espejos
-    [-1, 1].forEach((s) => esc3.appendChild(caja({ w: 5, h: 18, d: 5, x: 88, y: -16, z: s * 45, c: { pz: '#20282A', nz: '#20282A', px: '#20282A', nx: '#20282A', t: '#20282A', b: '#20282A' } })));
+    // espejos de camión: brazo + espejo grande + espejo convexo chico, a cada lado de la cabina
+    const carcasa = { pz: '#20282A', nz: '#20282A', px: '#20282A', nx: '#9DB4C0', t: '#20282A', b: '#20282A' };
+    [-1, 1].forEach((s) => {
+      esc3.appendChild(caja({ w: 4, h: 4, d: 14, x: 82, y: -14, z: s * 44, c: { pz: '#20282A', nz: '#20282A', px: '#20282A', nx: '#20282A', t: '#20282A', b: '#20282A' } }));
+      esc3.appendChild(caja({ w: 5, h: 28, d: 13, x: 82, y: -12, z: s * 54, c: carcasa }));
+      esc3.appendChild(caja({ w: 4, h: 10, d: 9, x: 82, y: 6, z: s * 52, c: carcasa }));
+    });
     // ruedas (eje trasero y delantero)
     [-1, 1].forEach((s) => { esc3.appendChild(rueda(-72, 43, s * 40)); esc3.appendChild(rueda(72, 43, s * 40)); });
     return esc3;
@@ -1358,7 +1532,7 @@ html,body{overscroll-behavior-y:none}
 <script>'use strict';
 (function () {
   const root = window;
-  const VERSION = 34;
+  const VERSION = 39;
   const L = window.R284;
   const KEY = 'r284.v1';
   const NAMEKEY = 'r284.nombre';
@@ -1368,7 +1542,7 @@ html,body{overscroll-behavior-y:none}
   const blank = () => ({
     clients: [], allTxns: {}, arqueo: {}, logisticaTxns: {},
     baseSemana: { desde: '', logistica: 0, arqueo: 0, arqueo1: 0, arqueo2: 0, cerradaEl: '' },
-    notas: [], retirosArch: {}, retEstado: { A: 0, B: 0, C: 0, cierre: {}, ref: null }, estCompras: { dia: {}, mes: {}, pegado: {}, imp: {} }, config: { pinHash: '' }
+    notas: [], retirosArch: {}, retEstado: { A: 0, B: 0, C: 0, cierre: {}, ref: null }, estCompras: { dia: {}, mes: {}, pegado: {}, imp: {} }, comprasConf: {}, reubic: {}, envios: {}, control: { partes: [], cc: [] }, config: { pinHash: '' }
   });
   function loadDB() {
     try { const r = localStorage.getItem(KEY); if (r) return Object.assign(blank(), JSON.parse(r)); } catch (e) {}
@@ -1444,6 +1618,35 @@ html,body{overscroll-behavior-y:none}
     const cuando = d && !isNaN(d) ? d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
     return `<div class="banner lockb"><b>🔒 Guardado</b><small>${esc(rec.editadoPor || '')}${cuando ? ' · ' + esc(cuando) : ''} — para modificarlo, tocá DESTRABAR abajo</small></div>`;
   }
+  // Compras confirmadas: quedan bloqueadas y se mandan al titular. Solo el titular las destraba.
+  const comprasConf = (f) => (DB.comprasConf && DB.comprasConf[f]) || null;
+  const comprasBloq = (f) => !!comprasConf(f);
+  let lastCcb = '';
+  function cambiosBanner() {
+    const p = cambiosPend(S.fecha); if (!p.n) return '';
+    return `<div style="padding:8px 12px 0"><div class="banner" style="border-color:#B3261E;background:#FDECEA"><b style="color:#B3261E">⚠ Hiciste cambios después de enviar</b><small style="display:block">${p.df.length ? p.df.length + ' dato(s) modificado(s)' : ''}${p.df.length && p.reub.length ? ' · ' : ''}${p.reub.length ? p.reub.length + ' re-ubicación(es)' : ''}. Mandale el cierre de nuevo al titular.</small><button class="btn green" data-a="cc-reenviar" style="width:100%;margin-top:8px">ENVIAR CAMBIOS</button></div></div>`;
+  }
+  const comprasBanner = () => cambiosBanner() + comprasBanner0();
+  function comprasBanner0() {
+    const f = S.fecha; if (diaBloqueado(f)) return '';
+    const cc = comprasConf(f);
+    if (cc) {
+      const cuando = new Date(cc.el), hh = isNaN(cuando) ? '' : cuando.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      if (!cc.enviado) return `<div style="padding:8px 12px 0"><div class="banner" style="border-color:#B3261E;background:#FDECEA"><b style="color:#B3261E">⚠ Falta enviar las compras al titular</b><small style="display:block">Confirmadas por ${esc(cc.por || '')}${hh ? ' a las ' + hh : ''}</small><div class="btns" style="margin-top:8px"><button class="btn green" data-a="cc-enviar" style="flex:1">ENVIAR CAMBIOS</button><button class="btn ghost" data-a="cc-destrabar">🔒 TITULAR</button></div></div></div>`;
+      return `<div style="padding:8px 12px 0"><div class="banner lockb"><b>🔒 Compras confirmadas y enviadas</b><small style="display:block">${esc(cc.por || '')}${hh ? ' · ' + hh : ''} — solo el titular puede cambiarlas</small><button class="btn ghost chico" data-a="cc-destrabar" style="margin-top:6px">DESTRABAR COMPRAS (titular)</button></div></div>`;
+    }
+    if (!dayTotals().compras) return '';
+    return `<div style="padding:8px 12px 0"><div class="banner"><b>Compras cargadas: falta confirmarlas</b><small style="display:block">Controlá el total con la planilla y confirmalo. Después ya no se pueden cambiar.</small><button class="btn green" data-a="cc-confirmar" style="width:100%;margin-top:8px">CONFIRMAR COMPRAS</button></div></div>`;
+  }
+  function pedirEnvioCompras() {
+    S.modal = { title: 'Enviar cambios', ok: 'ENVIAR CAMBIOS', cancel: 'DESPUÉS',
+      text: 'Las compras quedaron confirmadas. <b>Mandáselas ahora al titular</b> (por WhatsApp o mail) para que las tenga cargadas.<br><br>Si no las mandás, te va a quedar un aviso rojo en Cierre.',
+      onOk: () => enviarCompras(), onNo: () => { toast('Falta enviar las compras al titular.', 4000); render(); } };
+  }
+  function enviarCompras() {
+    const cc = comprasConf(S.fecha); if (cc) { cc.enviado = true; cc.enviadoEl = new Date().toISOString(); persist(); }
+    render(); pedirMotivoYEnviar();
+  }
   const getT = (f, cid) => (DB.allTxns[f] && DB.allTxns[f][cid]) || null;
 
   // ---------- Pantallas ----------
@@ -1485,7 +1688,7 @@ html,body{overscroll-behavior-y:none}
     const antes = L.saldoHasta(DB, c.id, f, false);
     const nuevo = L.r2(antes + L.mov(t));
     if (S.open === c.id || S.todos) {
-      const fld = (k, lab, bold) => `<label class="f">${lab}<input type="text" inputmode="decimal" data-k="${k}" data-id="${c.id}" class="${t && t[k] ? 'has' : ''}" placeholder="0,00" value="${t && t[k] ? L.fmtAR(t[k]) : ''}"${diaBloqueado(f) ? ' disabled' : ''}></label>`;
+      const fld = (k, lab, bold) => `<label class="f">${lab}<input type="text" inputmode="decimal" data-k="${k}" data-id="${c.id}" class="${t && t[k] ? 'has' : ''}" placeholder="0,00" value="${t && t[k] ? L.fmtAR(t[k]) : ''}"${diaBloqueado(f) || (k === 'compra' && comprasBloq(f)) ? ' disabled' : ''}></label>`;
       return `<section class="card open" aria-label="${esc(c.name)}"><button class="crow" data-a="close"><span class="n">${esc(c.name)}</span><span class="s" style="margin:0">Saldo anterior ${L.fmtAR(antes)}${S.todos ? '' : ' · cerrar ▲'}</span></button>
 <div class="grid">${fld('compra', 'Compra')}${fld('efectivo1', 'Efectivo COB 1')}${fld('efectivo2', 'Efectivo COB 2')}${fld('mercadopago', 'MercadoPago')}${fld('transferencia', 'Transferencia')}${fld('ajuste', 'Ajuste (+ / −)')}</div>
 <div class="new"><span class="a">Saldo nuevo</span><span class="b ${cls(nuevo)}" id="new-${c.id}">${L.fmtAR(nuevo)}</span></div></section>`;
@@ -1534,12 +1737,177 @@ html,body{overscroll-behavior-y:none}
       onOk: () => { const m = diaMeta(S.fecha); if (m) { m.guardado = false; m.actualizadoEl = new Date().toISOString(); m.editadoPor = S.name; } if (persist()) toast('Día destrabado', 3000); } };
     render();
   }
+
+  // ---------- Tokens de autorización ----------
+  const cfg = () => DB.config;
+  const esEmpleadoTel = () => !!cfg().tokClave && !cfg().tokSecret;
+  function genDesbloq() { const c = cfg(); return !!c.tokGenHash && c.tokGenOk === c.tokGenHash; }
+  function controlOff() {
+    if (!esEmpleadoTel()) return false;
+    const o = cfg().tokOff || {};
+    return !!o.perm || o.dia === today() || genDesbloq();
+  }
+  function estadoControl() {
+    if (!esEmpleadoTel()) return '';
+    const o = cfg().tokOff || {};
+    if (genDesbloq()) return 'Desbloqueado con el PIN del generador';
+    if (o.perm) return 'Control desactivado por el titular (siempre)';
+    if (o.dia === today()) return 'Control desactivado por el titular (solo hoy)';
+    return 'Control activo: los cambios piden token del titular';
+  }
+  function asegurarClave() {
+    if (!cfg().tokSecret) { const a = new Uint8Array(16); crypto.getRandomValues(a); cfg().tokSecret = Array.from(a).map((x) => x.toString(16).padStart(2, '0')).join(''); cfg().tokSerial = 0; persist(); }
+    return cfg().tokSecret;
+  }
+  // Pide autorización del titular: PIN de titular o token. Sin clave en el celular, solo PIN.
+  function autorizar(next) {
+    if (controlOff() || Date.now() < S.titularUntil) return next();
+    if (!cfg().tokClave || cfg().tokSecret) return requirePin(next);
+    S.modal = { title: 'Autorización del titular', ok: 'ENTRAR', cancel: 'ATRÁS',
+      text: 'Escribí el <b>token</b> que te mandó el titular por WhatsApp (sirve una sola vez), o el PIN de titular.',
+      txt: { ph: 'Token (ej. U0001-ABC234)' },
+      onTxt: async (v) => {
+        v = String(v).trim();
+        if (/^\d{4}$/.test(v)) {
+          if (!cfg().titularHash) return 'Este celular todavía no recibió los datos del titular.';
+          if ((await hashPin('T' + v)) !== cfg().titularHash) return 'PIN incorrecto.';
+          S.titularUntil = Date.now() + 5 * 60 * 1000; return null;
+        }
+        const r = await L.tokLeer(cfg().tokClave, v, today());
+        if (!r.ok) return r.error;
+        const usados = cfg().tokUsados || (cfg().tokUsados = []);
+        if (usados.includes(r.id)) return 'Ese token ya se usó. Pedile otro al titular.';
+        usados.push(r.id); if (usados.length > 400) usados.splice(0, usados.length - 400);
+        const o = cfg().tokOff || (cfg().tokOff = { perm: false, dia: '' });
+        if (r.tipo === 'D') o.dia = today();
+        else if (r.tipo === 'P') o.perm = true;
+        else if (r.tipo === 'A') { o.perm = false; o.dia = ''; cfg().tokGenOk = ''; persist(); return 'Control reactivado. Pedile un token de un uso.'; }
+        persist(); return null;
+      }, after: next };
+    render();
+  }
+  async function fabricarToken(tipo) {
+    const k = asegurarClave(); cfg().tokSerial = (cfg().tokSerial || 0) + 1;
+    const tok = await L.tokCrear(k, tipo, cfg().tokSerial, today()); persist();
+    S.tokUlt = { tipo, tok, el: new Date().toISOString() }; render();
+  }
+  function viewTokens() {
+    const emp = esEmpleadoTel(), u = S.tokUlt;
+    if (emp) return subHeader('Tokens y control') + `<div class="body">
+<section class="card sec"><h2>Estado</h2><p><b>${esc(estadoControl())}</b></p></section>
+<section class="card sec"><h2>Ingresar un token</h2><p>Si el titular te mandó un token para desactivar o reactivar el control, escribilo acá. Para re-ubicar un cobro o destrabar un día, el token se pide en el momento.</p>
+<button class="btn green" data-a="tk-ingresar" style="width:100%">INGRESAR TOKEN</button></section>
+<section class="card sec"><h2>Desbloqueo con PIN del generador</h2><p>Si el titular te dio el PIN del generador, el control queda desactivado en este celular hasta que él cambie ese PIN.</p>
+<button class="btn ghost" data-a="tk-gen" style="width:100%">${genDesbloq() ? 'YA ESTÁ DESBLOQUEADO' : 'DESBLOQUEAR CON PIN'}</button></section>
+${cfg().tokGenHash ? '' : ''}</div>` + nav();
+    const tn = L.TOK_TIPOS;
+    return subHeader('Tokens y control') + `<div class="body">
+${u ? `<section class="card sec" style="border:2px solid #0F4C4F"><h2>Token generado (${esc(tn[u.tipo])})</h2><p style="font-size:30px;font-weight:800;letter-spacing:2px;text-align:center;margin:8px 0;font-family:ui-monospace,Menlo,Consolas,monospace">${esc(u.tok)}</p>
+<div class="btns"><button class="btn green" data-a="tk-copiar">COPIAR</button><button class="btn ghost" data-a="tk-compartir">MANDAR</button></div><p><small>${u.tipo === 'U' ? 'Sirve una sola vez.' : u.tipo === 'D' ? 'Vale solo hoy.' : u.tipo === 'P' ? 'Desactiva el control hasta que mandes uno de reactivar.' : 'Vuelve a activar el control.'}</small></p></section>` : ''}
+<section class="card sec"><h2>Generar un token</h2><p>Mandáselo al empleado por WhatsApp. Su celular lo reconoce solo, sin internet.</p>
+<button class="btn green" data-a="tk-nuevo" data-v="U" style="width:100%;margin-bottom:8px">UN USO (re-ubicar o modificar)</button>
+<button class="btn ghost" data-a="tk-nuevo" data-v="D" style="width:100%;margin-bottom:8px">DESACTIVAR CONTROL SOLO HOY</button>
+<button class="btn ghost" data-a="tk-nuevo" data-v="P" style="width:100%;margin-bottom:8px">DESACTIVAR CONTROL SIEMPRE</button>
+<button class="btn ghost" data-a="tk-nuevo" data-v="A" style="width:100%">REACTIVAR CONTROL</button></section>
+<section class="card sec"><h2>PIN del generador</h2><p>Se lo das al empleado para que se desbloquee solo. ${cfg().tokGenHash ? '<b>Hay un PIN cargado.</b>' : 'Todavía no hay PIN.'} Si lo cambiás y le mandás <b>Enviar datos</b>, el control vuelve.</p>
+<input id="tk-pin" type="password" inputmode="numeric" maxlength="4" placeholder="PIN nuevo (4 números)" style="width:100%;height:48px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:20px;letter-spacing:5px;text-align:center">
+<div class="btns" style="margin-top:8px"><button class="btn green" data-a="tk-pinok">GUARDAR PIN</button><button class="btn ghost" data-a="tk-pinquitar">QUITAR</button></div></section>
+<section class="card sec"><p>Para que el empleado pueda reconocer tus tokens, mandale <b>Enviar datos</b> (Pasar datos entre celulares) una vez. Ahí recibe el validador.</p></section></div>` + nav();
+  }
+  // ---------- Re-ubicar un cobro ----------
+  function viewReubicar() {
+    const R = S.reu || (S.reu = { campo: 'mercadopago', de: '', a: '', monto: '' }), f = S.fecha;
+    const cl = DB.clients.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'));
+    const opt = (sel) => '<option value="">— elegir —</option>' + cl.map((c) => `<option value="${c.id}"${c.id === sel ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+    const t = R.de ? getT(f, R.de) : null, tiene = t ? t[R.campo] || 0 : 0;
+    const hoy = (DB.reubic && DB.reubic[f]) || [];
+    const sel = 'style="width:100%;height:46px;border:1px solid #C9D3D0;border-radius:10px;padding:0 8px;font-size:16px;background:#fff"';
+    return subHeader('Re-ubicar un cobro') + `<div class="body">
+<section class="card sec"><p>Pasa un cobro de un cliente a otro en el día <b>${esc(fechaLarga(f))}</b> (factura a otro nombre, MercadoPago de otro cliente, cobro mal cargado). No toca las compras. Pide token del titular.</p>
+<label class="f">Qué cobro es<select id="reu-campo" ${sel}>${L.CAMPOS_REUBIC.map((k) => `<option value="${k}"${R.campo === k ? ' selected' : ''}>${esc({ efectivo1: 'Efectivo COB 1', efectivo2: 'Efectivo COB 2', mercadopago: 'MercadoPago', transferencia: 'Transferencia' }[k])}</option>`).join('')}</select></label>
+<label class="f">Estaba cargado en<select id="reu-de" ${sel}>${opt(R.de)}</select></label>
+${R.de ? `<p style="margin:2px 0 6px"><small>Tiene cargado: <b>${L.fmtAR(tiene)}</b></small></p>` : ''}
+<label class="f">Tiene que pasar a<select id="reu-a" ${sel}>${opt(R.a)}</select></label>
+<label class="f">Monto a pasar<input id="reu-monto" type="text" inputmode="decimal" placeholder="0,00" value="${esc(R.monto)}"></label>
+<button class="btn green" data-a="reu-ok" style="width:100%;margin-top:10px">RE-UBICAR</button></section>
+${hoy.length ? '<section class="card sec"><h2>Re-ubicaciones de este día</h2>' + hoy.map((x) => `<div class="rline"><span>${esc(x.deNombre)} → ${esc(x.aNombre)}<br><small>${esc(x.campoTxt)} · ${esc(x.por || '')}</small></span><b>${L.fmtAR(x.monto)}</b></div>`).join('') + '</section>' : ''}</div>` + nav();
+  }
+  function cambiosPend(f) {
+    const sn = DB.envios && DB.envios[f]; if (!sn) return { df: [], reub: [], n: 0 };
+    const c = L.armarCierre(DB, f, ''), df = L.diffDia(sn.dia, c.dia, c.nombres), reub = ((DB.reubic || {})[f] || []).filter((r) => r.el > sn.el);
+    return { df, reub, n: df.length + reub.length };
+  }
+  function pedirMotivoYEnviar() {
+    if (!cambiosPend(S.fecha).n) return enviarCierre('');
+    let motivo = '';
+    S.modal = { title: 'Motivo del cambio', ok: 'ENVIAR', cancel: 'ATRÁS',
+      text: 'Hiciste cambios en lo que ya habías enviado. Escribí <b>el motivo</b>: el titular lo va a ver junto a los cambios.',
+      txt: { ph: 'Ej.: MP de Gil era de Pérez' },
+      onTxt: async (v) => { if (String(v).trim().length < 3) return 'Escribí el motivo.'; motivo = String(v).trim(); return null; }, after: () => enviarCierre(motivo) };
+    render();
+  }
+
+  // ---------- Control de partes de devolución y C.c. ----------
+  const ctlDB = () => {
+    if (!DB.control || !Array.isArray(DB.control.partes)) DB.control = { partes: [], cc: [] };
+    if (!Array.isArray(DB.control.cc)) DB.control.cc = [];
+    if (!Array.isArray(DB.control.destinos)) {
+      // En la app de colegas empieza vacía (se cargan en el primer uso); en la mía vienen los de siempre.
+      const colegas = !!(window.Licencia && window.Licencia.requerida);
+      DB.control.destinos = colegas ? [] : L.CTL_DESTINOS_MIOS.map((d) => Object.assign({}, d));
+    }
+    return DB.control;
+  };
+  const ctlPista = (txt) => { const d = ctlDB().destinos, r = L.ctlDestinoBuscar(d, txt); return !String(txt || '').trim() ? '' : r.ok ? '<b style="color:#0B6B5C">✔ ' + esc(r.dest.grupo + ' · ' + r.dest.nombre) + ' (' + esc(r.dest.cod) + ')</b>' : '<b style="color:#B3261E">' + esc(r.error) + '</b>'; };
+  const ctlEst = () => S.ctl || (S.ctl = { tab: 'partes' });
+  function viewControl() {
+    const E = ctlEst(), tab = E.tab, ctl = ctlDB(), hoy = today(), cc = tab === 'cc';
+    const quitados = L.ctlLimpiar(ctl, hoy, 90); if (quitados) persist();
+    const lista = L.ctlLista(ctl, tab), pend = lista.filter((x) => x.estado === 'pendiente'), rev = L.ctlParaTildar(ctl, tab, hoy);
+    const hoyNuevos = lista.filter((x) => x.estado === 'nuevo' && x.fecha >= hoy), afect = lista.filter((x) => x.estado === 'afectado').sort((a, b) => String(b.afectadoEl).localeCompare(String(a.afectadoEl)));
+    const cuenta = (t) => L.ctlLista(ctl, t).filter((x) => x.estado === 'pendiente').length;
+    const rot = (x) => (cc ? esc(x.cliente) + ' · Fact. ' + esc(x.clave) : (x.dest ? esc(x.dest) + ' · ' : x.cod ? esc(x.cod) + ' · ' : '') + 'Remito ' + esc(x.clave));
+    const dd = (f) => (f ? fechaCorta(f) : '');
+    const cli = DB.clients.filter((c) => c.active !== false).sort((a, b) => String(a.name).localeCompare(String(b.name), 'es'));
+    const inpS = 'style="width:100%;height:46px;border:1px solid #C9D3D0;border-radius:10px;padding:0 10px;font-size:16px;background:#fff"';
+    const fila = (x, extra) => `<div class="rline"><span>${rot(x)}<br><small>Cargado el ${esc(dd(x.fecha))}${x.por ? ' · ' + esc(x.por) : ''}${x.afectadoEl ? ' · afectado el ' + esc(dd(x.afectadoEl)) : ''}${x.resc ? ' · rescatado' : ''}</small></span>${extra || ''}</div>`;
+    return subHeader('Control de partes y C.c.') + `<div class="body">
+<div class="btns"><button class="btn ${tab === 'partes' ? 'on' : 'ghost'}" data-a="ct-tab" data-v="partes">Partes dev.${cuenta('partes') ? ' (' + cuenta('partes') + ')' : ''}</button><button class="btn ${tab === 'cc' ? 'on' : 'ghost'}" data-a="ct-tab" data-v="cc">C.c.${cuenta('cc') ? ' (' + cuenta('cc') + ')' : ''}</button></div>
+<section class="card sec"><h2>Cargar ${cc ? 'una factura' : 'un remito'}</h2>
+${cc ? `<label class="f">Cliente<select id="ct-cli" ${inpS}><option value="">— elegir —</option>${cli.map((c) => `<option value="${c.id}"${E.cli === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+<label class="f">N° de factura<input id="ct-nro" type="text" autocomplete="off" placeholder="Número de factura"></label>` : `<label class="f">N° de cliente<input id="ct-cod" type="text" inputmode="numeric" autocomplete="off" placeholder="Código o últimos números (ej. 719)"></label><div id="ct-pista" style="min-height:20px;margin:-4px 0 6px"></div>
+<label class="f">N° de remito<input id="ct-nro" type="text" inputmode="numeric" autocomplete="off" placeholder="Número de remito"></label>`}
+<div class="btns" style="margin-top:8px"><button class="btn green" data-a="ct-add">AGREGAR</button><button class="btn ghost" data-a="ct-paste">📋 COPIAR DEL PORTAPAPELES</button></div>
+<p style="margin:8px 0 0"><small>${cc ? 'Para varias: pegá renglones con CLIENTE y N° de factura (por ejemplo, la lista que te devuelve Claude).' : 'Para varios: pegá la lista con un renglón por parte: CLIENTE y REMITO (por ejemplo 30000609 3970).'}</small></p>
+${hoyNuevos.length ? '<h2 style="margin-top:14px">Cargados hoy (se revisan mañana)</h2>' + hoyNuevos.map((x) => fila(x, `<button class="chip" data-a="ct-del" data-v="${x.id}" aria-label="Quitar" style="flex:0 0 auto">✕</button>`)).join('') : ''}</section>
+${rev.length ? `<section class="card sec" style="border:2px solid #B7791F"><h2>Revisar: ¿LLSSA los afectó?</h2><p>Tildá los que figuran <b>afectados</b> en Logística. Los que no tildes pasan a <b>pendientes</b>.</p>
+${rev.map((x) => `<label class="chk" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid #E3E9E7"><input type="checkbox" data-ctk="${x.id}" style="width:24px;height:24px;margin-top:2px"><span><b>${rot(x)}</b><small style="display:block">Cargado el ${esc(dd(x.fecha))}</small></span></label>`).join('')}
+<button class="btn green" data-a="ct-guardar" style="width:100%;margin-top:10px">GUARDAR REVISIÓN</button></section>` : ''}
+<section class="card sec"><h2>${cc ? 'C.c. pendientes' : 'Partes pendientes'} (${pend.length})</h2>
+${pend.length ? pend.map((x) => fila(x, `<span class="bdg warn">${Math.max(1, Math.round((dateObj(hoy) - dateObj(x.fecha)) / 86400000))} d</span>`)).join('') : '<p>No hay pendientes.</p>'}
+<div style="border-top:1px solid #E3E9E7;margin-top:10px;padding-top:10px">${cc ? '' : '<label class="f">Apareció el parte: N° de cliente<input id="ct-cerrar-cod" type="text" inputmode="numeric" autocomplete="off" placeholder="Código o últimos números"></label><div id="ct-pista2" style="min-height:20px;margin:-4px 0 6px"></div>'}<label class="f">${cc ? 'Apareció la factura afectada: N° de factura' : 'N° de remito'}<input id="ct-cerrar" type="text" autocomplete="off" placeholder="Número"></label>
+<button class="btn green" data-a="ct-cerrar" style="width:100%;margin-top:8px">CERRAR EL CASO</button></div></section>
+${cc ? '' : `<section class="card sec"><h2>Clientes de partes (${ctl.destinos.length})</h2>
+${ctl.destinos.length ? '' : '<div class="banner">Cargá acá los clientes a los que les hacés partes. Se hace una sola vez.</div>'}
+${ctl.destinos.map((d, i) => `<div class="rline"><span><b>${esc(d.nombre)}</b> · ${esc(d.cod)}<br><small>${esc(d.grupo || '')}</small></span><button class="chip" data-a="ct-dquitar" data-v="${i}" aria-label="Quitar" style="flex:0 0 auto">✕</button></div>`).join('')}
+<div style="border-top:1px solid #E3E9E7;margin-top:10px;padding-top:10px"><label class="f">Grupo (ej. MILLAN)<input id="cd-gru" type="text" autocomplete="off"></label><label class="f">Nombre (ej. Central)<input id="cd-nom" type="text" autocomplete="off"></label><label class="f">Código completo<input id="cd-cod" type="text" inputmode="numeric" autocomplete="off"></label>
+<button class="btn green" data-a="ct-dagregar" style="width:100%;margin-top:8px">AGREGAR CLIENTE</button></div></section>
+`}<section class="card sec"><h2>Historial de afectados (${afect.length})</h2>
+${afect.length ? afect.slice(0, 40).map((x) => fila(x)).join('') + (afect.length > 40 ? '<p><small>Se muestran los 40 más recientes.</small></p>' : '') : '<p>Todavía no hay afectados.</p>'}
+<p style="margin:10px 0 6px"><small>Se limpian solos los de más de 90 días. Los pendientes no se borran. Para ver lo borrado, rescatalo de un respaldo viejo.</small></p>
+<label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">📂 RESCATAR DE RESPALDOS<input id="ct-file" type="file" accept=".json,application/json" multiple hidden></label></section></div>` + nav();
+  }
+  function ctlAgregarLista(items, tipo) {
+    const ctl = ctlDB(); let n = 0; const dup = [];
+    items.forEach((d) => { const r = L.ctlAgregar(ctl, tipo, d, today(), S.name); if (r.ok) n++; else dup.push(d.clave + ': ' + r.error); });
+    if (persist()) { toast(n + (n === 1 ? ' agregado' : ' agregados') + (dup.length ? ' · ' + dup.length + ' ya estaban' : ''), 3500); render(); }
+  }
   function viewCierre() {
     const dom = dateObj(S.fecha).getDay() === 0;
     return header('Cierre del día', true) +
       (dom ? '<div style="padding:8px 12px 0"><div class="banner">Es domingo: normalmente no se trabaja. Podés cargar igual si hace falta.</div></div>' : '') +
       respaldoBanner() + limpiezaBanner() +
-      (diaBloqueado(S.fecha) ? lockBanner() : '') +
+      (diaBloqueado(S.fecha) ? lockBanner() : '') + '<div id="ccb">' + (lastCcb = comprasBanner()) + '</div>' +
       `<div class="btnrow"><button class="btn sm ghost" data-a="pg-abrir">📋 Pegar lista</button><button class="btn sm filt ${S.solo ? 'on' : 'ghost'}" data-a="solo" aria-pressed="${S.solo}">${S.solo ? 'Con saldo' : 'Todos'}</button><button class="btn sm ${S.todos ? 'on' : 'ghost'}" data-a="todos" aria-pressed="${S.todos}">${S.todos ? 'Cerrar todos' : 'Abrir todos'}</button></div><div class="search"><div class="qw"><input id="q" type="text" inputmode="search" autocomplete="off" placeholder="Buscar cliente" aria-label="Buscar cliente" value="${esc(S.q)}"><button class="qx" data-a="qclear" aria-label="Borrar búsqueda" ${S.q ? '' : 'hidden'}>✕</button></div></div>` +
       `<div class="body" id="list">${listHTML()}</div><button class="upbtn" data-a="arriba" aria-label="Volver arriba" hidden>↑</button><div class="foot" id="foot">${footHTML()}</div>` + nav();
   }
@@ -1626,9 +1994,9 @@ ${c ? `<section class="card sec"><h2>Para el titular</h2><button class="btn ghos
   function viewPegar() {
     const P = S.pegar, f = S.fecha;
     if (P.paso === 'revisar') return viewPegarRevisar();
-    const lk = diaBloqueado(f);
+    const lkC = P.campo === 'compra' && comprasBloq(f), lk = diaBloqueado(f) || lkC, tit = Date.now() < S.titularUntil;
     return subHeader('Pegar lista') + `<div class="body">
-${lk ? '<div class="banner"><b>El día ' + esc(fechaLarga(f)) + ' está guardado.</b> Volvé a Cierre y destrabalo antes de pegar una lista.</div>' : ''}
+${lk ? (lkC && !diaBloqueado(f) ? '<div class="banner"><b>Las compras de ' + esc(fechaLarga(f)) + ' ya están confirmadas.</b> Solo el titular puede destrabarlas desde Cierre.</div>' : '<div class="banner"><b>El día ' + esc(fechaLarga(f)) + ' está guardado.</b> Volvé a Cierre y destrabalo antes de pegar una lista.</div>') : ''}
 <section class="card sec"><h2>1. ¿Qué lista es?</h2><div class="chips">${PG_CAMPOS.map((x) => `<button class="btn sm ${P.campo === x[0] ? 'on' : 'ghost'}" data-a="pg-campo" data-v="${x[0]}">${x[1]}</button>`).join('')}</div>
 <p style="margin:10px 0 0">Se carga en <b>${esc(fechaLarga(f))}</b>.</p></section>
 <section class="card sec"><h2>2. ${lectorCfg() ? 'Sacá la foto' : 'Leé la foto con Claude'}</h2>
@@ -1640,8 +2008,9 @@ ${lectorCfg() ? `<p>${(P.fotos || []).length ? '<b>' + P.fotos.length + ' foto(s
 <button class="btn ghost" data-a="pg-copiar" style="width:100%">COPIAR INSTRUCCIONES PARA CLAUDE</button></details>` : `<p>Abrí tu proyecto de Claude, mandale la foto y copiá la lista que te devuelva. Después pegala abajo.</p>
 <button class="btn ghost" data-a="pg-copiar" style="width:100%">COPIAR INSTRUCCIONES PARA CLAUDE (si las necesitás)</button>`}</section>
 <section class="card sec"><h2>3. Revisá o pegá la lista</h2>
-<textarea id="pg-txt" rows="8" placeholder="ACOSTA;12345,67&#10;ANDRADA;5000,00&#10;TOTAL;17345,67" style="width:100%;border-radius:12px;border:1px solid #C9D3D0;padding:10px;font:14px ui-monospace,Menlo,Consolas,monospace">${esc(P.texto || '')}</textarea>
-<div class="btns" style="margin-top:8px"><button class="btn ghost" data-a="pg-pegar">PEGAR DEL PORTAPAPELES</button></div></section></div>
+<textarea id="pg-txt" rows="8" placeholder="ACOSTA;12345,67&#10;ANDRADA;5000,00&#10;TOTAL;17345,67" style="width:100%;border-radius:12px;border:1px solid #C9D3D0;padding:10px;font:14px ui-monospace,Menlo,Consolas,monospace"${tit ? '' : ' readonly'}>${esc(P.texto || '')}</textarea>
+${tit ? '' : '<p style="margin:6px 0 0"><small>🔒 La lista solo se puede pegar del portapapeles. Para escribir o cambiar valores a mano hace falta el PIN del titular.</small></p>'}
+<div class="btns" style="margin-top:8px"><button class="btn ghost" data-a="pg-pegar">PEGAR DEL PORTAPAPELES</button>${tit ? '' : '<button class="btn ghost" data-a="pg-editar">✏️ EDITAR (titular)</button>'}</div></section></div>
 <div class="foot"><button class="btn green" data-a="pg-leer" style="flex:1${lk ? ';opacity:.4' : ''}"${lk ? ' disabled' : ''}>LEER LISTA</button></div>` + nav();
   }
   function pgResumen(L_) {
@@ -1794,6 +2163,9 @@ ${c.pct != null ? `<div class="rline"><span>Variación</span><b style="color:${c
       case 'cform': return viewCForm();
       case 'cmasivo': return viewCMasivo();
       case 'ranking': return viewRanking();
+      case 'tokens': return viewTokens();
+      case 'control': return viewControl();
+      case 'reubicar': return viewReubicar();
       case 'informe': return viewInforme();
       case 'lector': return viewLector();
       case 'notas': return viewNotas();
@@ -1826,6 +2198,9 @@ ${window.Licencia && window.Licencia.requerida ? row('licencia', 'Licencia', esc
 ${row('clientes', 'Clientes', 'Altas, bajas, mail, teléfono y saldo inicial', true)}
 ${row('notas', 'Bitácora', 'Notas del día', false)}
 ${row('pasar', 'Pasar datos entre celulares', 'Enviar cierre, sumar cierre y saldos', false)}
+${row('control', 'Control de partes dev. y C.c.', 'Remitos y facturas afectados por LLSSA', false)}
+${row('reubicar', 'Re-ubicar un cobro', 'Pasar un cobro de un cliente a otro (pide token)', false)}
+${row('tokens', 'Tokens y control', 'Autorizaciones del titular', false)}
 ${DB.config.lector ? row('lector', 'Lector de fotos', 'Configurado ✓', false) : ''}
 ${row('respaldo', 'Respaldo', 'Hacer o restaurar el archivo de respaldo', true)}
 ${row('archivar', 'Limpiar historial viejo', 'Si la app se pone lenta: borra días anteriores y deja los saldos', true)}
@@ -2106,7 +2481,8 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     if (!S.modal) return '';
     const m = S.modal;
     const pins = m.pin ? `<input id="mpin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="PIN" placeholder="PIN de 4 números" style="height:52px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:22px;letter-spacing:6px;text-align:center">${m.pin === 2 ? '<input id="mpin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Repetir PIN" placeholder="Repetilo" style="height:52px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:22px;letter-spacing:6px;text-align:center">' : ''}<div id="merr" role="alert" style="color:#B3261E;font-weight:700;min-height:18px;font-size:14px"></div>` : '';
-    return `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(m.title)}"><div class="box"><h3>${esc(m.title)}</h3><p>${m.text}</p>${pins}<div class="btns"><button class="btn ghost" data-a="m-no">${esc(m.cancel || 'ATRÁS')}</button><button class="btn ${m.danger ? 'red' : 'green'}" data-a="m-ok">${esc(m.ok)}</button></div></div></div>`;
+    const txt = m.txt ? `<input id="mtxt" type="text" autocomplete="off" autocapitalize="characters" aria-label="${esc(m.txt.ph || '')}" placeholder="${esc(m.txt.ph || '')}" style="height:52px;border-radius:12px;border:1px solid #C9D3D0;padding:0 14px;font-size:20px;text-align:center;letter-spacing:1px"><div id="merr" role="alert" style="color:#B3261E;font-weight:700;min-height:18px;font-size:14px"></div>` : '';
+    return `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(m.title)}"><div class="box"><h3>${esc(m.title)}</h3><p>${m.text}</p>${pins}${txt}<div class="btns"><button class="btn ghost" data-a="m-no">${esc(m.cancel || 'ATRÁS')}</button><button class="btn ${m.danger ? 'red' : 'green'}" data-a="m-ok">${esc(m.ok)}</button></div></div></div>`;
   }
 
   function render() {
@@ -2158,7 +2534,7 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
     } catch (e) { if (e && e.name === 'AbortError') { toast('Se canceló el envío.', 3000); return false; } }
     bajar(nombre, blob); toast(aviso || 'Archivo guardado en Descargas.', 4500); return true;
   }
-  const datosCompletos = () => ({ exportedAt: new Date().toISOString(), clients: DB.clients, allTxns: DB.allTxns, arqueo: DB.arqueo, logisticaTxns: DB.logisticaTxns, baseSemana: DB.baseSemana, notas: DB.notas, retirosArch: DB.retirosArch, retEstado: DB.retEstado, estCompras: DB.estCompras });
+  const datosCompletos = () => ({ exportedAt: new Date().toISOString(), clients: DB.clients, allTxns: DB.allTxns, arqueo: DB.arqueo, logisticaTxns: DB.logisticaTxns, baseSemana: DB.baseSemana, notas: DB.notas, retirosArch: DB.retirosArch, retEstado: DB.retEstado, estCompras: DB.estCompras, comprasConf: DB.comprasConf || {}, reubic: DB.reubic || {}, envios: DB.envios || {}, control: DB.control || { partes: [], cc: [] } });
   function marcarRespaldo() {
     DB.config.respaldo = Date.now();
     try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {}
@@ -2206,7 +2582,7 @@ ${nuevo ? '' : `<button class="btn ${c.active === false ? 'ghost' : 'red'}" data
         title: '¿Restaurar este respaldo?', ok: 'RESTAURAR', danger: true,
         text: `Trae <b>${o.clients.length} clientes</b> y <b>${dias} días</b>${o.exportedAt ? ' (hecho el ' + esc(o.exportedAt.slice(0, 10)) + ')' : ''}.<br><br><b>Reemplaza todo lo que hay ahora en este celular.</b>${aviso}`,
         onOk: () => {
-          DB = Object.assign(blank(), { clients: o.clients, allTxns: o.allTxns, arqueo: o.arqueo || {}, logisticaTxns: o.logisticaTxns || {}, baseSemana: o.baseSemana || blank().baseSemana, notas: o.notas || [], retirosArch: o.retirosArch || {}, retEstado: o.retEstado || blank().retEstado, estCompras: o.estCompras || blank().estCompras, config: DB.config });
+          DB = Object.assign(blank(), { clients: o.clients, allTxns: o.allTxns, arqueo: o.arqueo || {}, logisticaTxns: o.logisticaTxns || {}, baseSemana: o.baseSemana || blank().baseSemana, notas: o.notas || [], retirosArch: o.retirosArch || {}, retEstado: o.retEstado || blank().retEstado, estCompras: o.estCompras || blank().estCompras, comprasConf: o.comprasConf || {}, reubic: o.reubic || {}, envios: o.envios || {}, control: o.control && o.control.partes ? o.control : { partes: [], cc: [] }, config: DB.config });
           if (persist()) toast('Respaldo efectuado', 3000);
         }
       };
@@ -2403,13 +2779,16 @@ ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</b
 <h2 style="margin-top:16px">Recibir datos del titular</h2><p>Abrí el archivo que mandó el titular. Se actualizan los saldos y los días corregidos. Lo que ya cargaste hoy sin guardar no se pierde.</p>
 <label class="btn ghost" style="display:flex;align-items:center;justify-content:center;width:100%">ELEGIR ARCHIVO<input id="file-s" type="file" accept=".json,application/json" hidden></label></section></div>` + nav();
   }
-  function enviarCierre() {
-    const c = L.armarCierre(DB, S.fecha, S.name);
-    const nom = 'cierre-' + S.fecha + '-' + (S.name || 'equipo').replace(/[^\wÁÉÍÓÚÑáéíóúñ-]/g, '') + '.json';
+  function enviarCierre(motivo) {
+    const f = S.fecha, c = L.armarCierre(DB, f, S.name), pend = cambiosPend(f);
+    if (DB.envios && DB.envios[f]) { c.cambios = pend.df; c.reubic = pend.reub; c.motivo = motivo || ''; }
+    const nom = 'cierre-' + f + '-' + (S.name || 'equipo').replace(/[^\wÁÉÍÓÚÑáéíóúñ-]/g, '') + '.json';
+    DB.envios = DB.envios || {}; DB.envios[f] = { el: new Date().toISOString(), dia: c.dia }; persist(); render();
     entregar(nom, new Blob([JSON.stringify(c, null, 2)], { type: 'application/json' }), 'Cierre guardado en Descargas. Mandalo por WhatsApp.');
   }
   function enviarSaldos() {
     const d = Object.assign(datosCompletos(), { tipo: 'saldos-r284' });
+    if (!esEmpleadoTel()) { d.tokClave = asegurarClave(); d.tokGenHash = cfg().tokGenHash || ''; if (cfg().titularHash) d.titularHash = cfg().titularHash; }
     entregar('saldos-actualizados-' + today() + '.json', new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }), 'Saldos guardados en Descargas. Mandalos por WhatsApp.');
   }
   function leerRespaldosViejos(files) {
@@ -2436,7 +2815,7 @@ ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</b
       const p = L.recibirDatos(DB, o, false);
       S.modal = { title: '¿Recibir los datos del titular?', ok: 'RECIBIR', danger: false,
         text: `Trae <b>${o.clients.length} clientes</b> y <b>${Object.keys(o.allTxns).length} días</b>. Reemplaza los saldos y los días guardados de este celular.<br><br>Se mantienen tus <b>${p.conservadas}</b> cargas de días sin guardar.${p.reemplazadas ? `<br><br><b style="color:#B3261E">${p.reemplazadas} cargas tuyas de días ya guardados quedan reemplazadas por las del titular.</b>` : ''}`,
-        onOk: () => { L.recibirDatos(DB, o, true); if (persist()) toast('Datos recibidos', 3500); } };
+        onOk: () => { L.recibirDatos(DB, o, true); if (o.tokClave && !cfg().tokSecret) { cfg().tokClave = o.tokClave; cfg().tokGenHash = o.tokGenHash || ''; if (o.titularHash) cfg().titularHash = o.titularHash; } if (persist()) toast('Datos recibidos', 3500); } };
       render();
     };
     r.readAsText(file);
@@ -2448,10 +2827,12 @@ ${un ? '<button class="btn" data-a="p-saldos" style="width:100%">ENVIAR DATOS</b
       let c; try { c = JSON.parse(r.result); } catch (e) { return toast('Ese archivo no es válido. No se cambió nada.', 4500); }
       if (!c || c.tipo !== 'cierre-r284' || !/^\d{4}-\d{2}-\d{2}$/.test(c.fecha || '') || typeof c.dia !== 'object') return toast('Ese archivo no es un cierre de la app. No se cambió nada.', 4500);
       const p = L.sumarCierre(DB, c, false), lst = (t, a) => a.length ? `<br>${t}: <b>${a.slice(0, 6).map(esc).join(', ')}${a.length > 6 ? ' y ' + (a.length - 6) + ' más' : ''}</b>` : '';
-      const hay = p.agregados.length || p.completados.length || p.arqueo === 'agregado' || p.logistica === 'agregado' || p.arqueo === 'completado' || p.logistica === 'completado';
-      S.modal = { title: '¿Sumar este cierre?', ok: hay ? 'SUMAR' : 'ENTENDIDO', danger: false,
-        text: `Cierre del <b>${esc(fechaLarga(c.fecha))}</b> mandado por <b>${esc(c.de || '?')}</b>.<br><br>Se agregan <b>${p.agregados.length}</b> clientes${p.arqueo === 'agregado' ? ' + arqueo' : ''}${p.logistica === 'agregado' ? ' + logística' : ''}.${p.completados.length || p.arqueo === 'completado' || p.logistica === 'completado' ? `<br>Se completan datos que faltaban en <b>${p.completados.length}</b> clientes${p.arqueo === 'completado' ? ' + arqueo' : ''}${p.logistica === 'completado' ? ' + logística' : ''}.` : ''}<br>Ya estaban iguales: ${p.iguales.length}.${lst('Ya tenían otro dato (queda lo tuyo)', p.conflictos)}${p.arqueo === 'conflicto' ? '<br>El arqueo ya tenía otro dato (queda el tuyo).' : ''}${p.logistica === 'conflicto' ? '<br>La logística ya tenía otro dato (queda la tuya).' : ''}${lst('Clientes que no existen acá (no se suman)', p.desconocidos)}`,
-        onOk: () => { if (!hay) return; L.sumarCierre(DB, c, true); S.fecha = c.fecha; if (persist()) toast('Cierre sumado', 3500); } };
+      const camb = Array.isArray(c.cambios) ? c.cambios : [], reub = Array.isArray(c.reubic) ? c.reubic : [], campoT = { compra: 'Compra', efectivo1: 'Efectivo COB 1', efectivo2: 'Efectivo COB 2', mercadopago: 'MercadoPago', transferencia: 'Transferencia', ajuste: 'Ajuste' };
+      const cambTxt = camb.length || reub.length ? `<span style="display:block;border:1px solid #B3261E;border-radius:12px;background:#FDECEA;text-align:left;margin:8px 0;padding:10px;font-size:15px"><b style="color:#B3261E">⚠ Cambios sobre lo ya enviado</b>${c.motivo ? '<br>Motivo que escribió: <b>' + esc(c.motivo) + '</b>' : '<br><b>No escribió motivo: consultaselo.</b>'}${camb.slice(0, 12).map((x) => '<br>• ' + esc(x.nombre) + ' · ' + esc(campoT[x.k] || x.k) + ': ' + L.fmtAR(x.antes) + ' → <b>' + L.fmtAR(x.despues) + '</b>').join('')}${camb.length > 12 ? '<br>…y ' + (camb.length - 12) + ' más' : ''}${reub.slice(0, 8).map((x) => '<br>• Re-ubicó ' + L.fmtAR(x.monto) + ' (' + esc(x.campoTxt || x.campo) + ') de ' + esc(x.deNombre) + ' a ' + esc(x.aNombre)).join('')}<br><small>Al tocar APLICAR, estos cambios reemplazan lo que tenías.</small></span>` : '';
+      const hay = camb.length || p.agregados.length || p.completados.length || p.arqueo === 'agregado' || p.logistica === 'agregado' || p.arqueo === 'completado' || p.logistica === 'completado';
+      S.modal = { title: camb.length || reub.length ? 'Cierre con cambios' : '¿Sumar este cierre?', ok: hay ? (camb.length ? 'APLICAR' : 'SUMAR') : 'ENTENDIDO', danger: false,
+        text: `Cierre del <b>${esc(fechaLarga(c.fecha))}</b> mandado por <b>${esc(c.de || '?')}</b>.${cambTxt}<br><br>Se agregan <b>${p.agregados.length}</b> clientes${p.arqueo === 'agregado' ? ' + arqueo' : ''}${p.logistica === 'agregado' ? ' + logística' : ''}.${p.completados.length || p.arqueo === 'completado' || p.logistica === 'completado' ? `<br>Se completan datos que faltaban en <b>${p.completados.length}</b> clientes${p.arqueo === 'completado' ? ' + arqueo' : ''}${p.logistica === 'completado' ? ' + logística' : ''}.` : ''}<br>Ya estaban iguales: ${p.iguales.length}.${lst('Ya tenían otro dato (queda lo tuyo)', p.conflictos)}${p.arqueo === 'conflicto' ? '<br>El arqueo ya tenía otro dato (queda el tuyo).' : ''}${p.logistica === 'conflicto' ? '<br>La logística ya tenía otro dato (queda la tuya).' : ''}${lst('Clientes que no existen acá (no se suman)', p.desconocidos)}`,
+        onOk: () => { if (!hay) return; L.sumarCierre(DB, c, true); L.aplicarCambios(DB, c.fecha, camb); S.fecha = c.fecha; if (persist()) toast('Cierre sumado', 3500); } };
       render();
     };
     r.readAsText(file);
@@ -2516,6 +2897,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
           if (L.KEYS.every((k) => !dd[id][k])) delete dd[id];
         }
         dd.__meta__ = { editadoPor: S.name, actualizadoEl: new Date().toISOString(), guardado: false };
+        if (DB.comprasConf) delete DB.comprasConf[S.fecha];
         if (persist()) toast('Día limpiado. Podés deshacerlo desde Más.', 4000);
       } };
     render();
@@ -2535,6 +2917,13 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       if (!/^\d{4}$/.test(p1)) err = 'Escribí 4 números.';
       else if (m.pin === 2 && p1 !== p2) err = 'Los dos PIN tienen que ser iguales.';
       else err = await m.onPin(p1);
+      if (err) { const e = document.getElementById('merr'); if (e) e.textContent = err; return; }
+      S.modal = null; render(); if (m.after) m.after();
+      return;
+    }
+    if (m.txt) {
+      const v = (document.getElementById('mtxt') || {}).value || '';
+      const err = await m.onTxt(v);
       if (err) { const e = document.getElementById('merr'); if (e) e.textContent = err; return; }
       S.modal = null; render(); if (m.after) m.after();
       return;
@@ -2573,9 +2962,91 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'cal-hoy') { S.fecha = today(); S.open = null; S.cal = null; render(); }
     else if (a === 'dia') { S.fecha = shiftDay(S.fecha, Number(v)); S.open = null; render(); }
     else if (a === 'lg-usar') { const s = L.sugLogistica(DB, S.fecha), r = DB.logisticaTxns[S.fecha]; if (r && !recBloq(r)) { r.efectivoAyer = s.efectivoAyer; if (persist()) { toast('Efectivo actualizado con el del Arqueo', 3000); render(); } } }
-    else if (a === 'destrabar') requirePin(confirmDestrabar);
-    else if (a === 'adestr') requirePin(() => confirmDestrabarRec('arqueo'));
-    else if (a === 'ldestr') requirePin(() => confirmDestrabarRec('logistica'));
+    else if (a === 'destrabar') autorizar(confirmDestrabar);
+    else if (a === 'adestr') autorizar(() => confirmDestrabarRec('arqueo'));
+    else if (a === 'ldestr') autorizar(() => confirmDestrabarRec('logistica'));
+    else if (a === 'cc-confirmar') {
+      const t = dayTotals(), n = Object.keys(DB.allTxns[S.fecha] || {}).filter((k) => k !== '__meta__' && DB.allTxns[S.fecha][k].compra).length;
+      S.modal = { title: 'Confirmar compras', ok: 'SÍ, ES CORRECTO', cancel: 'ATRÁS',
+        text: `Total de compras: <b>$${L.fmtAR(t.compras)}</b> (${n} ${n === 1 ? 'cliente' : 'clientes'}).<br><br>¿Coincide con la planilla? Después de confirmar <b>no se pueden cambiar</b>.`,
+        onOk: () => { DB.comprasConf = DB.comprasConf || {}; DB.comprasConf[S.fecha] = { por: S.name, el: new Date().toISOString(), enviado: false }; S.open = null; if (persist()) pedirEnvioCompras(); } };
+      render();
+    }
+    else if (a === 'cc-enviar') enviarCompras();
+    else if (a === 'cc-destrabar') autorizar(() => {
+      S.modal = { title: '¿Destrabar las compras?', ok: 'DESTRABAR', cancel: 'ATRÁS', danger: true,
+        text: 'Se pueden volver a editar las compras del <b>' + esc(fechaLarga(S.fecha)) + '</b>. Después hay que confirmarlas y enviarlas de nuevo.',
+        onOk: () => { if (DB.comprasConf) delete DB.comprasConf[S.fecha]; persist(); toast('Compras destrabadas', 3000); } };
+      render();
+    });
+    else if (a === 'ct-tab') { ctlEst().tab = v; render(); }
+    else if (a === 'ct-add') {
+      const E = ctlEst(), cc = E.tab === 'cc', nro = (document.getElementById('ct-nro') || {}).value || '';
+      if (cc) { const cid = (document.getElementById('ct-cli') || {}).value || '', c = DB.clients.find((x) => x.id === cid); E.cli = cid; const r = L.ctlAgregar(ctlDB(), 'cc', { clave: nro, cid, cliente: c ? c.name : '' }, today(), S.name); if (!r.ok) return toast(r.error, 3500); }
+      else { const cod = (document.getElementById('ct-cod') || {}).value || '', b = L.ctlDestinoBuscar(ctlDB().destinos, cod); if (!b.ok) return toast(b.error, 4000); const r = L.ctlAgregar(ctlDB(), 'partes', { clave: nro, cod: b.dest.cod, dest: b.dest.nombre }, today(), S.name); if (!r.ok) return toast(r.error, 3500); }
+      if (persist()) { toast('Agregado', 2000); render(); }
+    }
+    else if (a === 'ct-paste') {
+      const E = ctlEst(), cc = E.tab === 'cc';
+      (navigator.clipboard && navigator.clipboard.readText ? navigator.clipboard.readText() : Promise.reject()).then((txt) => {
+        if (cc) {
+          const it = L.ctlLeerCC(txt, DB.clients); if (!it.length) return toast('No encontré renglones con cliente y número de factura.', 4500);
+          S.modal = { title: '¿Agregar ' + it.length + ' facturas?', ok: 'AGREGAR', cancel: 'ATRÁS', text: it.slice(0, 10).map((x) => esc(x.cliente) + (x.sinCliente ? ' <b style="color:#B3261E">(cliente no encontrado)</b>' : '') + ' · ' + esc(x.clave)).join('<br>') + (it.length > 10 ? '<br>…y ' + (it.length - 10) + ' más' : ''), onOk: () => ctlAgregarLista(it, 'cc') };
+        } else {
+          const it = L.ctlLeerPartes(txt, ctlDB().destinos); if (!it.length) return toast('No encontré renglones con cliente y remito en el portapapeles.', 4500);
+          const ok = it.filter((x) => !x.sinCliente), mal = it.filter((x) => x.sinCliente);
+          S.modal = { title: '¿Agregar ' + ok.length + ' remitos?', ok: ok.length ? 'AGREGAR' : 'ATRÁS', cancel: ok.length ? 'ATRÁS' : '', text: ok.slice(0, 15).map((x) => esc(x.dest) + ' · ' + esc(x.clave)).join('<br>') + (ok.length > 15 ? '<br>…y ' + (ok.length - 15) + ' más' : '') + (mal.length ? '<br><b style="color:#B3261E">No se agregan (cliente no reconocido):</b><br>' + mal.slice(0, 10).map((x) => '<b style="color:#B3261E">' + esc(x.dest) + ' · ' + esc(x.clave) + '</b>').join('<br>') : ''), onOk: () => { if (ok.length) ctlAgregarLista(ok, 'partes'); } };
+        }
+        render();
+      }, () => toast('No pude leer el portapapeles. Copiá la lista y probá de nuevo.', 4500));
+    }
+    else if (a === 'ct-dagregar') {
+      const g = (id) => ((document.getElementById(id) || {}).value || '').trim(), nom = g('cd-nom'), cod = g('cd-cod').replace(/\D/g, ''), gru = g('cd-gru').toUpperCase();
+      if (!nom || cod.length < 4) return toast('Escribí el nombre y el código completo.', 3500);
+      const ds = ctlDB().destinos; if (ds.some((d) => d.cod === cod)) return toast('Ese código ya está.', 3000);
+      ds.push({ grupo: gru, nombre: nom, cod }); if (persist()) { toast('Cliente agregado', 2000); render(); }
+    }
+    else if (a === 'ct-dquitar') { const ds = ctlDB().destinos, d = ds[+v]; if (d) { S.modal = { title: '¿Quitar este cliente?', ok: 'QUITAR', cancel: 'ATRÁS', danger: true, text: 'Se quita <b>' + esc(d.nombre) + '</b> de la lista. Los partes ya cargados no se tocan.', onOk: () => { ds.splice(+v, 1); persist(); } }; render(); } }
+    else if (a === 'ct-del') { const E = ctlEst(), x = L.ctlLista(ctlDB(), E.tab).find((y) => y.id === v); if (x) { S.modal = { title: '¿Quitar este número?', ok: 'QUITAR', cancel: 'ATRÁS', danger: true, text: 'Se quita <b>' + esc(x.clave) + '</b> de lo cargado hoy.', onOk: () => { const l = L.ctlLista(ctlDB(), E.tab), i = l.findIndex((y) => y.id === v); if (i >= 0) l.splice(i, 1); persist(); } }; render(); } }
+    else if (a === 'ct-guardar') {
+      const E = ctlEst(), ids = Array.from(document.querySelectorAll('[data-ctk]:checked')).map((e) => e.dataset.ctk), tot = L.ctlParaTildar(ctlDB(), E.tab, today()).length;
+      S.modal = { title: 'Guardar revisión', ok: 'GUARDAR', cancel: 'ATRÁS', text: `<b>${ids.length}</b> quedan como <b>afectados</b> y <b>${tot - ids.length}</b> pasan a <b>pendientes</b>.`, onOk: () => { const r = L.ctlResolver(ctlDB(), E.tab, ids, today()); if (persist()) toast(r.afectados + ' afectados · ' + r.pendientes + ' pendientes', 3500); } };
+      render();
+    }
+    else if (a === 'ct-cerrar') {
+      const E = ctlEst(), nro = (document.getElementById('ct-cerrar') || {}).value || '', cc2 = E.tab === 'cc' ? '' : (document.getElementById('ct-cerrar-cod') || {}).value || '', bb = cc2 ? L.ctlDestinoBuscar(ctlDB().destinos, cc2) : null;
+      if (E.tab !== 'cc' && (!bb || !bb.ok)) return toast(bb ? bb.error : 'Escribí el número de cliente.', 4000);
+      const r = L.ctlCerrar(ctlDB(), E.tab, nro, today(), bb ? bb.dest.cod : '');
+      if (!r.ok) return toast(r.error, 4500);
+      if (persist()) { toast('Caso cerrado: ' + r.item.clave, 3500); render(); }
+    }
+    else if (a === 'tk-nuevo') fabricarToken(v);
+    else if (a === 'tk-copiar') { const t = S.tokUlt && S.tokUlt.tok; if (t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Token copiado', 2500), () => toast('No se pudo copiar. Anotalo a mano.', 3500)); } }
+    else if (a === 'tk-compartir') { const u = S.tokUlt; if (u) { const tx = 'Token APP FLET (' + L.TOK_TIPOS[u.tipo] + '): ' + u.tok; if (navigator.share) navigator.share({ text: tx }).catch(() => {}); else toast('Tu celular no puede compartir. Copialo y mandalo por WhatsApp.', 4000); } }
+    else if (a === 'tk-pinok') { const e = document.getElementById('tk-pin'); if (!e || !/^\d{4}$/.test(e.value)) return toast('Escribí 4 números.', 3000); hashPin('G' + e.value).then((h) => { cfg().tokGenHash = h; persist(); toast('PIN guardado. Mandale Enviar datos al empleado.', 4500); render(); }); }
+    else if (a === 'tk-pinquitar') { cfg().tokGenHash = ''; persist(); toast('PIN quitado. Mandale Enviar datos al empleado.', 4000); render(); }
+    else if (a === 'tk-ingresar') autorizar(() => { toast('Listo', 2000); render(); });
+    else if (a === 'tk-gen') {
+      if (genDesbloq()) return;
+      if (!cfg().tokGenHash) return toast('El titular todavía no creó un PIN del generador.', 4000);
+      S.modal = { title: 'PIN del generador', text: 'Escribí el PIN que te dio el titular.', ok: 'DESBLOQUEAR', pin: 1,
+        onPin: async (p) => ((await hashPin('G' + p)) !== cfg().tokGenHash ? 'PIN incorrecto.' : (cfg().tokGenOk = cfg().tokGenHash, persist(), null)), after: () => render() };
+      render();
+    }
+    else if (a === 'reu-ok') {
+      const R = S.reu || {}; R.monto = (document.getElementById('reu-monto') || {}).value || R.monto || '';
+      const o = { campo: R.campo, de: R.de, a: R.a, monto: L.parseAR(R.monto) }, f = S.fecha;
+      const tmp = { clients: DB.clients, allTxns: { [f]: JSON.parse(JSON.stringify(DB.allTxns[f] || {})) } }, chk = L.reubicar(tmp, f, isNaN(o.monto) ? Object.assign({}, o, { monto: 0 }) : o);
+      if (!chk.ok) return toast(chk.error, 4000);
+      autorizar(() => {
+        L.reubicar(DB, f, o);
+        const nm = (id) => (DB.clients.find((c) => c.id === id) || {}).name || id, ct = { efectivo1: 'Efectivo COB 1', efectivo2: 'Efectivo COB 2', mercadopago: 'MercadoPago', transferencia: 'Transferencia' }[o.campo];
+        DB.reubic = DB.reubic || {}; (DB.reubic[f] = DB.reubic[f] || []).push({ de: o.de, a: o.a, deNombre: nm(o.de), aNombre: nm(o.a), campo: o.campo, campoTxt: ct, monto: o.monto, por: S.name, el: new Date().toISOString() });
+        const m = diaMeta(f); if (m) { m.editadoPor = S.name; m.actualizadoEl = new Date().toISOString(); }
+        S.reu = { campo: o.campo, de: '', a: '', monto: '' }; if (persist()) toast('Cobro re-ubicado', 3500);
+      });
+    }
+    else if (a === 'pg-editar') requirePin(() => render());
     else if (a === 'pg-abrir') { S.pegar = { paso: 'texto', campo: 'compra', texto: '' }; render(); }
     else if (a === 'pg-campo') { const e = document.getElementById('pg-txt'); if (e) S.pegar.texto = e.value; S.pegar.campo = v; render(); }
     else if (a === 'pg-copiar') {
@@ -2683,6 +3154,9 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
       else if (v === 'difcob') { S.sub = 'difcob'; S.dcf = 'ambos'; render(); }
       else if (v === 'licencia') window.Licencia.abrir();
       else if (v === 'informe') requirePin(() => { S.inf = null; S.sub = 'informe'; render(); });
+      else if (v === 'control') { S.sub = 'control'; render(); }
+      else if (v === 'reubicar') { S.reu = null; S.sub = 'reubicar'; render(); }
+      else if (v === 'tokens') { if (esEmpleadoTel()) { S.sub = 'tokens'; render(); } else requirePin(() => { asegurarClave(); S.tokUlt = null; S.sub = 'tokens'; render(); }); }
       else if (v === 'ranking') requirePin(() => { S.rk = null; S.sub = 'ranking'; render(); });
       else if (v === 'historial') { S.sub = 'historial'; S.selCli = null; S.hq = ''; render(); }
       else if (v === 'clientes') requirePin(() => { S.sub = 'clientes'; S.hq = ''; render(); });
@@ -2728,7 +3202,8 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     else if (a === 'r-desc') bajar('resumen-' + S.rdia + '.txt', new Blob([L.textoResumen(DB, S.rdia)], { type: 'text/plain' }));
     else if (a === 'r-comp') compartirTexto(L.textoResumen(DB, S.rdia));
     else if (a === 'p-pin') requirePin(() => render());
-    else if (a === 'p-enviar') enviarCierre();
+    else if (a === 'p-enviar') pedirMotivoYEnviar();
+    else if (a === 'cc-reenviar') pedirMotivoYEnviar();
     else if (a === 'p-saldos') enviarSaldos();
     else if (a === 'arc-resp') { hacerRespaldo(); S.arcOk = true; render(); }
     else if (a === 'arc-ir') confirmArchivar();
@@ -2744,6 +3219,7 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     const t = e.target;
     if (t.id === 'name') { S.name = t.value; localStorage.setItem(NAMEKEY, S.name); }
     else if (t.id === 'q') { S.q = t.value; e2x(); refreshList(); }
+    else if (t.id === 'ct-cod' || t.id === 'ct-cerrar-cod') { const el = document.getElementById(t.id === 'ct-cod' ? 'ct-pista' : 'ct-pista2'); if (el) el.innerHTML = ctlPista(t.value); }
     else if (t.dataset && t.dataset.k && !diaBloqueado(S.fecha)) { // vista en vivo de saldos y totales mientras se escribe (se guarda al terminar de editar el campo)
       const n = L.parseAR(t.value); if (isNaN(n)) return;
       const k = t.dataset.k, old = Number((getT(S.fecha, t.dataset.id) || {})[k]) || 0, d = L.r2(n - old), sg = (k === 'compra' || k === 'ajuste') ? 1 : -1;
@@ -2783,7 +3259,21 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
   app.addEventListener('change', (e) => {
     const t = e.target;
     if (t.dataset && (t.dataset.ret || t.dataset.rc)) { persist(); return; }
+    if (t.id === 'ct-file' && t.files && t.files.length) {
+      const fs = Array.from(t.files), objs = []; let falt = fs.length;
+      const fin = () => {
+        if (--falt > 0) return;
+        const p = L.ctlRescatar(ctlDB(), objs, false);
+        if (!objs.length) return toast('Esos archivos no tienen datos de partes ni C.c. No se cambió nada.', 4500);
+        if (!p.nuevos) { S.modal = { title: 'Nada para rescatar', ok: 'ENTENDIDO', text: 'No hay registros que falten (' + p.ya + ' ya están acá).' }; return render(); }
+        S.modal = { title: '¿Rescatar registros?', ok: 'RESCATAR', cancel: 'ATRÁS', text: 'Se recuperan <b>' + p.nuevos + '</b> registros de partes y C.c. que ya no están. Solo eso: no se toca nada más. Quedan marcados como rescatados y no se vuelven a limpiar.', onOk: () => { L.ctlRescatar(ctlDB(), objs, true); if (persist()) toast('Rescatados ' + p.nuevos, 3500); } };
+        render();
+      };
+      fs.forEach((f) => { const r = new FileReader(); r.onload = () => { try { const o = JSON.parse(r.result); if (o && o.control) objs.push(o); } catch (e) {} fin(); }; r.onerror = fin; r.readAsText(f); });
+      return;
+    }
     if (t.id === 'hist-mes') { S.histMes = t.value; return; }
+    if (t.id === 'reu-de' || t.id === 'reu-a' || t.id === 'reu-campo') { const R = S.reu || (S.reu = {}); R[t.id === 'reu-de' ? 'de' : t.id === 'reu-a' ? 'a' : 'campo'] = t.value; const m = document.getElementById('reu-monto'); if (m) R.monto = m.value; render(); return; }
     if (t.id === 'pm-mes') { infEstado().pmYm = t.value; render(); return; }
     if (t.id === 'inf-mes') { infEstado().ym = t.value; render(); return; }
     if (t.id === 'imp-file' && t.files && t.files.length) return leerRespaldosViejos(Array.from(t.files));
@@ -2819,10 +3309,12 @@ ${ok ? `<section class="card sec"><h2>Paso 2: respaldo</h2><p>Primero se hace un
     if (t.dataset && (t.dataset.arq || t.dataset.lg)) { const n = L.parseAR(t.value); if (isNaN(n)) { toast('Ese número no es válido.'); } else { t.value = n ? L.fmtAR(n) : ''; t.classList.toggle('has', !!n); } return; }
     if (t.dataset && t.dataset.k) {
       if (diaBloqueado(S.fecha)) return toast('El día está guardado. Destrabalo con el PIN de titular.', 3500);
+      if (t.dataset.k === 'compra' && comprasBloq(S.fecha)) return toast('Las compras están confirmadas. Solo el titular las puede destrabar.', 3500);
       const n = L.parseAR(t.value);
       const t0 = getT(S.fecha, t.dataset.id);
       if (isNaN(n)) { toast('Ese número no es válido.'); t.value = t0 && t0[t.dataset.k] ? L.fmtAR(t0[t.dataset.k]) : ''; return; }
       setVal(S.fecha, t.dataset.id, t.dataset.k, n);
+      { const cb = document.getElementById('ccb'), h = comprasBanner(); if (cb && h !== lastCcb) { cb.innerHTML = h; lastCcb = h; } }
       t.value = n ? L.fmtAR(n) : '';
       t.classList.toggle('has', !!n);
       const antes = L.saldoHasta(DB, t.dataset.id, S.fecha, false);
